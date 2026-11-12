@@ -1,0 +1,238 @@
+<mvc:View controllerName="zelectr.controller.View1"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns:core="sap.ui.core"
+    xmlns="sap.m">
+    <Page id="page" title="{i18n>title}" showNavButton="false">
+        <content>
+            <VBox class="zeMain">
+
+                <!-- ============ Filter / header section ============ -->
+                <Panel headerText="{i18n>filterHeader}" class="zePanel">
+                    <content>
+                        <HBox wrap="Wrap" alignItems="End" class="zeFilterBar">
+                            <VBox class="zeFilterItem">
+                                <Label text="{i18n>plant}" labelFor="plantInput"/>
+                                <Input id="plantInput" value="2010" maxLength="4" width="8rem"/>
+                            </VBox>
+                            <VBox class="zeFilterItem">
+                                <Label text="{i18n>position}" labelFor="posInput"/>
+                                <Input id="posInput" maxLength="15" width="12rem" placeholder="{i18n>positionPlaceholder}"/>
+                            </VBox>
+                            <VBox class="zeFilterItem">
+                                <Label text="{i18n>month}" labelFor="monthPicker"/>
+                                <DatePicker id="monthPicker" displayFormat="yyyy-MM-dd" valueFormat="yyyy-MM-dd" width="10rem"/>
+                            </VBox>
+                            <VBox class="zeFilterItem">
+                                <Label text="{i18n>manualFilter}" labelFor="manualSelect"/>
+                                <Select id="manualSelect" selectedKey="ALL" width="9rem" forceSelection="true">
+                                    <core:Item key="ALL" text="{i18n>manualAll}"/>
+                                    <core:Item key="AUTO" text="{i18n>manualAutomatic}"/>
+                                    <core:Item key="MANUAL" text="{i18n>manualManual}"/>
+                                </Select>
+                            </VBox>
+                            <VBox class="zeFilterItem">
+                                <Label text="{i18n>strategy}" labelFor="strategySelect"/>
+                                <Select id="strategySelect" width="18rem" forceSelection="true"
+                                    items="{vm>/strategies}" selectedKey="{vm>/selectedStrategy}">
+                                    <core:Item key="{vm>id}" text="{vm>label}"/>
+                                </Select>
+                            </VBox>
+                            <VBox class="zeFilterItem">
+                                <Button id="loadButton" text="{i18n>load}" type="Emphasized" press=".onLoad"
+                                    enabled="{vm>/canLoad}"/>
+                            </VBox>
+                        </HBox>
+                        <Text text="{i18n>strategyHint}" class="zeHint"/>
+                    </content>
+                </Panel>
+
+                <!-- ============ Position and formula section ============ -->
+                <Panel headerText="{i18n>formulaHeader}" visible="{vm>/hasResults}" class="zePanel">
+                    <content>
+                        <HBox wrap="Wrap" alignItems="Center" class="zeHeaderLine">
+                            <ObjectStatus text="{vm>/header/parserStatus}" state="{vm>/header/parserState}"/>
+                            <ObjectStatus text="{vm>/header/uom}" class="zeUom"/>
+                            <ObjectStatus text="{vm>/header/formulaChanged}" state="{vm>/header/formulaChangedState}" class="zeUom"/>
+                        </HBox>
+                        <Text text="{vm>/header/formula}" class="zeFormula"/>
+                        <Text text="{vm>/header/parserMessage}" class="zeWarning" visible="{vm>/header/hasParserMessage}"/>
+                    </content>
+                </Panel>
+
+                <!-- ============ KPI strip ============ -->
+                <Panel headerText="{i18n>kpiHeader}" visible="{vm>/hasResults}" class="zePanel">
+                    <content>
+                        <HBox wrap="Wrap" items="{vm>/kpis}" class="zeKpiStrip">
+                            <VBox class="zeKpi">
+                                <Label text="{vm>title}"/>
+                                <ObjectStatus text="{vm>value}" state="{vm>state}"/>
+                            </VBox>
+                        </HBox>
+                        <HBox wrap="Wrap" alignItems="Center" class="zeHeaderLine">
+                            <Label text="{i18n>monthlySummary}"/>
+                            <ObjectStatus text="{vm>/monthly/status}" state="{vm>/monthly/state}" class="zeUom"/>
+                            <Text text="{vm>/monthly/reason}" class="zeWarning"/>
+                        </HBox>
+                    </content>
+                </Panel>
+
+                <!-- ============ Monthly results table ============ -->
+                <Panel headerText="{i18n>resultsHeader}" visible="{vm>/hasResults}" class="zePanel">
+                    <content>
+                        <Table id="resultsTable" items="{vm>/results}" mode="SingleSelectMaster"
+                            selectionChange=".onRowSelected" growing="true" growingThreshold="31"
+                            noDataText="{i18n>noResults}">
+                            <columns>
+                                <Column width="7rem"><header><Text text="{i18n>colDate}"/></header></Column>
+                                <Column width="5rem"><header><Text text="{i18n>colManual}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colStoredAdjusted}" tooltip="{i18n>ttStoredAdjusted}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colStoredSuggested}" tooltip="{i18n>ttStoredSuggested}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colBackendComputed}" tooltip="{i18n>ttBackendComputed}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colJsValue}" tooltip="{i18n>ttJsValue}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colDifference}" tooltip="{i18n>ttDifference}"/></header></Column>
+                                <Column width="9rem"><header><Text text="{i18n>colComparison}" tooltip="{i18n>ttComparison}"/></header></Column>
+                                <Column width="10rem"><header><Text text="{i18n>colStatus}" tooltip="{i18n>ttStatus}"/></header></Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem type="Active">
+                                    <cells>
+                                        <Text text="{vm>dateIso}"/>
+                                        <Text text="{vm>manualEntryText}"/>
+                                        <Text text="{vm>storedAdjusted}"/>
+                                        <Text text="{vm>storedSuggested}"/>
+                                        <Text text="{vm>backendComputed}"/>
+                                        <Text text="{vm>jsValue}"/>
+                                        <Text text="{vm>difference}"/>
+                                        <ObjectStatus text="{vm>comparisonText}" state="{vm>comparisonState}"/>
+                                        <ObjectStatus text="{vm>statusText}" state="{vm>statusState}"/>
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                        <HBox wrap="Wrap" alignItems="Center" class="zeHeaderLine">
+                            <Label text="{i18n>totalsLabel}"/>
+                            <ObjectStatus text="{i18n>colStoredAdjusted}: {vm>/totals/storedAdjusted}" class="zeUom"/>
+                            <ObjectStatus text="{i18n>colStoredSuggested}: {vm>/totals/storedSuggested}" class="zeUom"/>
+                            <ObjectStatus text="{i18n>colJsValue}: {vm>/totals/jsValue}" state="Information" class="zeUom"/>
+                            <ObjectStatus text="{i18n>colDifference}: {vm>/totals/difference}" class="zeUom"/>
+                        </HBox>
+                        <Text text="{vm>/totals/note}" class="zeHint"/>
+                        <Text text="{i18n>resultsHint}" class="zeHint"/>
+                    </content>
+                </Panel>
+
+                <!-- ============ Reference breakdown ============ -->
+                <Panel headerText="{i18n>detailHeader}" visible="{vm>/hasResults}" class="zePanel">
+                    <content>
+                        <Text text="{vm>/selected/detailTitle}" class="zeHint"/>
+                        <Table id="detailTable" items="{vm>/selected/detail}" noDataText="{i18n>noDetail}">
+                            <columns>
+                                <Column width="3rem"><header><Text text="{i18n>colSeq}"/></header></Column>
+                                <Column width="3rem"><header><Text text="{i18n>colSign}"/></header></Column>
+                                <Column width="9rem"><header><Text text="{i18n>colRefPosition}"/></header></Column>
+                                <Column width="6rem" hAlign="End"><header><Text text="{i18n>colMultiplier}"/></header></Column>
+                                <Column width="6rem" hAlign="End"><header><Text text="{i18n>colDivisor}"/></header></Column>
+                                <Column width="7rem"><header><Text text="{i18n>colSourceDate}"/></header></Column>
+                                <Column width="5rem"><header><Text text="{i18n>colSourceManual}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colRefAdjusted}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colRefSuggested}"/></header></Column>
+                                <Column width="9rem" hAlign="End"><header><Text text="{i18n>colBackendRefAdjusted}"/></header></Column>
+                                <Column width="9rem" hAlign="End"><header><Text text="{i18n>colBackendContribution}"/></header></Column>
+                                <Column width="9rem" hAlign="End"><header><Text text="{i18n>colJsContribution}"/></header></Column>
+                                <Column width="7rem"><header><Text text="{i18n>colRefStatus}"/></header></Column>
+                                <Column width="16rem"><header><Text text="{i18n>colRule}"/></header></Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem>
+                                    <cells>
+                                        <Text text="{vm>seq}"/>
+                                        <Text text="{vm>sign}"/>
+                                        <Text text="{vm>refPosition}"/>
+                                        <Text text="{vm>multiplier}"/>
+                                        <Text text="{vm>divisor}"/>
+                                        <Text text="{vm>sourceDate}"/>
+                                        <Text text="{vm>sourceManual}"/>
+                                        <Text text="{vm>refAdjusted}"/>
+                                        <Text text="{vm>refSuggested}"/>
+                                        <Text text="{vm>backendRefAdjusted}"/>
+                                        <Text text="{vm>backendContribution}"/>
+                                        <Text text="{vm>jsContribution}"/>
+                                        <ObjectStatus text="{vm>refStatus}" state="{vm>refState}"/>
+                                        <Text text="{vm>rule}"/>
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+
+                <!-- ============ JS parser output ============ -->
+                <Panel headerText="{i18n>parseHeader}" visible="{vm>/hasResults}" class="zePanel">
+                    <content>
+                        <Text text="{vm>/selected/parseTitle}" class="zeHint"/>
+                        <Table id="parseTable" items="{vm>/selected/terms}" noDataText="{i18n>noParse}">
+                            <columns>
+                                <Column width="4rem"><header><Text text="{i18n>colSeq}"/></header></Column>
+                                <Column width="4rem"><header><Text text="{i18n>colSign}"/></header></Column>
+                                <Column width="12rem"><header><Text text="{i18n>colRefPosition}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colMultiplier}"/></header></Column>
+                                <Column width="8rem" hAlign="End"><header><Text text="{i18n>colDivisor}"/></header></Column>
+                                <Column width="24rem"><header><Text text="{i18n>colParseNote}"/></header></Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem>
+                                    <cells>
+                                        <Text text="{vm>seq}"/>
+                                        <Text text="{vm>sign}"/>
+                                        <Text text="{vm>refPosition}"/>
+                                        <Text text="{vm>multiplier}"/>
+                                        <Text text="{vm>divisor}"/>
+                                        <Text text="{vm>explanation}"/>
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+
+                <!-- ============ Backend parser output + comparison ============ -->
+                <Panel headerText="{i18n>backendHeader}" visible="{vm>/hasResults}" class="zePanel">
+                    <content>
+                        <Text text="{vm>/selected/comparisonTitle}" class="zeHint"/>
+                        <Table id="comparisonTable" items="{vm>/selected/comparison}" noDataText="{i18n>noBackend}">
+                            <columns>
+                                <Column width="4rem"><header><Text text="{i18n>colSeq}"/></header></Column>
+                                <Column width="4rem"><header><Text text="{i18n>colSign}"/></header></Column>
+                                <Column width="12rem"><header><Text text="{i18n>colRefPosition}"/></header></Column>
+                                <Column width="7rem" hAlign="End"><header><Text text="{i18n>colMultiplier}"/></header></Column>
+                                <Column width="7rem" hAlign="End"><header><Text text="{i18n>colDivisor}"/></header></Column>
+                                <Column width="4rem"><header><Text text="{i18n>colBackendSign}"/></header></Column>
+                                <Column width="12rem"><header><Text text="{i18n>colBackendRef}"/></header></Column>
+                                <Column width="7rem" hAlign="End"><header><Text text="{i18n>colBackendMultiplier}"/></header></Column>
+                                <Column width="7rem" hAlign="End"><header><Text text="{i18n>colBackendDivisor}"/></header></Column>
+                                <Column width="10rem"><header><Text text="{i18n>colComponentMatch}"/></header></Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem>
+                                    <cells>
+                                        <Text text="{vm>seq}"/>
+                                        <Text text="{vm>jsSign}"/>
+                                        <Text text="{vm>jsRefPosition}"/>
+                                        <Text text="{vm>jsMultiplier}"/>
+                                        <Text text="{vm>jsDivisor}"/>
+                                        <Text text="{vm>backendSign}"/>
+                                        <Text text="{vm>backendRefPosition}"/>
+                                        <Text text="{vm>backendMultiplier}"/>
+                                        <Text text="{vm>backendDivisor}"/>
+                                        <ObjectStatus text="{vm>matchText}" state="{vm>matchState}"/>
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>

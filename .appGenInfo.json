@@ -1,0 +1,23 @@
+{
+  "generationParameters": {
+    "generationDate": "Thu Nov 12 2026 00:51:31 GMT+0200 (Eastern European Standard Time)",
+    "generatorPlatform": "Visual Studio Code",
+    "serviceType": "OData URL",
+    "metadataFilename": "",
+    "serviceUrl": "https://ds4.achemosgrupe.lt/sap/opu/odata/sap/Z_BIND_ELECTR_CNT_001",
+    "appName": "z_electr",
+    "appTitle": "Electricity counter",
+    "appDescription": "An SAP Fiori application.",
+    "appNamespace": "",
+    "ui5Theme": "sap_horizon",
+    "ui5Version": "1.120.30",
+    "enableEslint": false,
+    "enableTypeScript": false,
+    "showMockDataInfo": true,
+    "generatorVersion": "1.20.1",
+    "template": "Basic V2",
+    "generatorName": "SAP Fiori Application Generator",
+    "entityRelatedConfig": [],
+    "launchText": "To launch the generated application, run the following from the generated application root folder:\n\n```\n    npm start\n```"
+  }
+}

@@ -1,0 +1,54 @@
+/* Styles for the electricity counter formula validation app */
+
+.zeMain {
+    padding: 0.5rem;
+}
+
+.zePanel {
+    margin-bottom: 0.75rem;
+}
+
+.zeFilterBar {
+    margin-bottom: 0.25rem;
+}
+
+.zeFilterItem {
+    margin-right: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.zeHeaderLine {
+    margin-bottom: 0.5rem;
+}
+
+.zeUom {
+    margin-left: 1rem;
+}
+
+.zeFormula {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.95rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.zeWarning {
+    color: var(--sapNeutralTextColor, #6a6d70);
+    font-style: italic;
+    margin-left: 0.5rem;
+}
+
+.zeHint {
+    font-size: 0.8rem;
+    color: var(--sapNeutralTextColor, #6a6d70);
+    margin-bottom: 0.5rem;
+}
+
+.zeKpiStrip {
+    margin-bottom: 0.5rem;
+}
+
+.zeKpi {
+    margin-right: 2rem;
+    margin-bottom: 0.25rem;
+}
