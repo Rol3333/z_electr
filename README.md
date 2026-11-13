@@ -79,6 +79,44 @@ webapp/
 - `Z_C_ELECR_VALIDATE_REF` — backend parsed components keyed by lowercase `plant`, `pos`, `valid_date`, `manual_entry`, `seq`; compared structurally (sign, reference, multiplier, divisor) with the JS parse per occurrence.
 - `Z_I_ELECR_CNTR` — daily source rows for reference positions; all rows (automatic and manual) are kept; duplicates are never discarded.
 
+## Two reports (v0.2)
+
+The application now contains **three directly addressable destinations** — the original formula-validation diagnostic view plus two calculation reports. Each can be opened directly via its own URL hash and from a separate Fiori Launchpad tile, without visiting a home page first:
+
+| Destination | Local URL (with `npm run start-noflp`) | FLP tile intent parameter |
+|---|---|---|
+| Formula test | `#formula-test` (also the app default) | `report=formulaTest` |
+| Current month — all positions | `#current-month` | `report=currentMonth` |
+| Position — 12-month overview | `#year-report` or `#year-report/<pos>` | `report=yearReport` (optionally `&pos=<position>`) |
+
+All three reports share one navigation strip, so users can switch freely.
+
+### Current month — all positions
+
+- One row per position of the internal plant (`2010`, a centralized constant, not a user parameter) for the **dynamically determined current month**; no filter bar needed, only a Refresh action.
+- Columns: Main workshop, Position, Description, **Adjusted (JS)**, **Suggested (JS)**, **Adjusted (ABAP)**, **Suggested (ABAP)**, UOM, Past measurement (reference only, when exposed), Formula, Notes.
+- The four quantity columns come from two parser representations evaluated by the **same** evaluator against the same resolved references:
+  - **JS** = terms of the independent JavaScript parser (`formulaParser.js`);
+  - **ABAP** = persisted component rows of `Z_C_ELECR_VALIDATE_REF` (the backend parser output);
+  - each representation is evaluated twice: with **adjusted** and with **suggested** reference period values.
+- Monthly aggregation uses the `PERIOD_CHANGE` candidate rule (last reading in the month minus the closest earlier opening reading, matching the bE31X fixture reconstruction) — clearly labelled `PROVISIONAL / P(position) RULE NOT VERIFIED` everywhere.
+- Structural JS-vs-ABAP component comparison per occurrence; a mismatch is visible even when totals match.
+- Notes aggregate parser status, missing/ambiguous references, unit issues, formula changes and metadata gaps; the covered date range and the latest source date are shown so users see whether the month is complete.
+
+### Position — 12-month overview
+
+- Two user-facing parameters only: **Position** and **Year** (year defaults to the current year). Exactly 12 rows (January–December) are always shown; empty months display `NO DATA` instead of disappearing.
+- The same four quantity variants, the same evaluator, resolver and aggregation rule as the current-month report (no second calculation engine).
+- Selecting a month shows a JS-vs-ABAP component comparison detail panel for that month.
+- Navigation from the current-month report prefills the position (`#year-report/<pos>`).
+
+### Metadata capability detection
+
+The bundled `metadata.xml` is a snapshot and may lag behind the live service (e.g. when `MainWorkshop`, a position-description property or `PastMeasurement` is added to the backend). Instead of guessing, the report service reads the **live service metadata at runtime** (`ODataModel.getServiceMetadata()`) and:
+- includes optional fields in `$select` only when they exist in the live metadata (a non-existent `$select` field would fail the request);
+- uses the exact description property name found in metadata (no guessed names);
+- shows explicit notes such as `MainWorkshop not exposed by the service` or `Position description not exposed by the service` when a field is absent — the gap is visible, never faked.
+
 ## Current limitations (important)
 
 1. **`P(position)` semantics are NOT confirmed.** The OData projection `Z_I_ELECR_CNTR` does not expose `PAST_MEASUREMENT`, so the exact ABAP rule (current reading vs daily consumption vs difference to previous/opening reading) cannot be verified from the frontend. Two provisional strategies are provided (`EXACT_DATE_ADJUSTED`, `PREVIOUS_READING_DIFFERENCE`); every numeric result is labelled `PROVISIONAL`.

@@ -5,6 +5,11 @@
     <Page id="page" title="{i18n>title}" showNavButton="false">
         <content>
             <VBox class="zeMain">
+                <HBox wrap="Wrap" alignItems="Center" class="zeNavStrip">
+                    <Button text="{i18n>navFormulaTest}" type="Emphasized" press=".onNavFormulaTest"/>
+                    <Button text="{i18n>navCurrentMonth}" press=".onNavCurrentMonth"/>
+                    <Button text="{i18n>navYearReport}" press=".onNavYearReport"/>
+                </HBox>
 
                 <!-- ============ Filter / header section ============ -->
                 <Panel headerText="{i18n>filterHeader}" class="zePanel">

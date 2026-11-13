@@ -1,0 +1,69 @@
+<mvc:View controllerName="zelectr.controller.CurrentMonth"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+    <Page id="currentMonthPage" title="{i18n>cmTitle}" showNavButton="false">
+        <headerContent>
+            <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh"/>
+            <Button icon="sap-icon://filter" tooltip="{i18n>cmParameters}" press=".onOpenPrompt"/>
+        </headerContent>
+        <content>
+            <VBox class="zeMain">
+                <HBox wrap="Wrap" alignItems="Center" class="zeNavStrip">
+                    <Button text="{i18n>navFormulaTest}" press=".onNavFormulaTest"/>
+                    <Button text="{i18n>navCurrentMonth}" type="Emphasized" press=".onNavCurrentMonth"/>
+                    <Button text="{i18n>navYearReport}" press=".onNavYearReport"/>
+                </HBox>
+
+                <HBox wrap="Wrap" alignItems="Center" class="zeHeaderLine">
+                    <ObjectStatus text="{vm>/rangeText}" state="None"/>
+                    <ObjectStatus text="{vm>/latestDateText}" state="Information" class="zeUom"/>
+                    <ObjectStatus text="{vm>/provisionalText}" state="Warning" class="zeUom"/>
+                </HBox>
+                <Text text="{vm>/capabilityText}" class="zeHint"/>
+
+                <HBox wrap="Wrap" alignItems="Center" class="zeHeaderLine">
+                    <SearchField id="searchField" width="18rem" search=".onSearch"
+                        placeholder="{i18n>cmSearchPlaceholder}"/>
+                    <ObjectStatus text="{vm>/kpiText}" state="None" class="zeUom"/>
+                </HBox>
+
+                <Table id="positionsTable" items="{path: 'vm>/rows'}" mode="SingleSelectMaster"
+                    selectionChange=".onRowSelected" growing="true" growingThreshold="50"
+                    noDataText="{i18n>cmNoData}">
+                    <columns>
+                        <Column width="8rem"><header><Text text="{i18n>colWorkshop}"/></header></Column>
+                        <Column width="8rem"><header><Text text="{i18n>colPos}"/></header></Column>
+                        <Column width="12rem"><header><Text text="{i18n>colPosDescr}"/></header></Column>
+                        <Column width="9rem" hAlign="End"><header><Text text="{i18n>colAdjJs}" tooltip="{i18n>ttAdjJs}"/></header></Column>
+                        <Column width="9rem" hAlign="End"><header><Text text="{i18n>colSugJs}" tooltip="{i18n>ttSugJs}"/></header></Column>
+                        <Column width="9rem" hAlign="End"><header><Text text="{i18n>colAdjAbap}" tooltip="{i18n>ttAdjAbap}"/></header></Column>
+                        <Column width="9rem" hAlign="End"><header><Text text="{i18n>colSugAbap}" tooltip="{i18n>ttSugAbap}"/></header></Column>
+                        <Column width="4rem"><header><Text text="{i18n>colUom}"/></header></Column>
+                        <Column width="6rem" visible="{vm>/hasPastMeasurement}"><header><Text text="{i18n>colPastMeasurement}"/></header></Column>
+                        <Column width="16rem"><header><Text text="{i18n>colFormula}"/></header></Column>
+                        <Column width="18rem"><header><Text text="{i18n>colNotes}"/></header></Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem type="Active">
+                            <cells>
+                                <Text text="{vm>workshop}"/>
+                                <Text text="{vm>pos}"/>
+                                <Text text="{vm>descr}"/>
+                                <Text text="{vm>adjJs}"/>
+                                <Text text="{vm>sugJs}"/>
+                                <Text text="{vm>adjAbap}"/>
+                                <Text text="{vm>sugAbap}"/>
+                                <Text text="{vm>uom}"/>
+                                <Text text="{vm>pastMeasurement}"/>
+                                <Text text="{vm>formulaShort}" tooltip="{vm>formula}"/>
+                                <ObjectStatus text="{vm>status}" state="{vm>state}" tooltip="{vm>notesText}"/>
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+                <Text text="{i18n>cmHint}" class="zeHint"/>
+                <Text text="{vm>/zeroFilterText}" class="zeHint"/>
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>

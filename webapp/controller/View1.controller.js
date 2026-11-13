@@ -650,6 +650,21 @@ sap.ui.define([
 
         _text: function (sKey) {
             return this.getOwnerComponent().getModel("i18n").getResourceBundle().getText(sKey);
+        },
+
+        // ------------------------------------------------------------------
+        // Navigation between the three reports
+        // ------------------------------------------------------------------
+        onNavFormulaTest: function () {
+            sap.ui.core.UIComponent.getRouterFor(this).navTo("RouteFormulaTest", {}, true);
+        },
+
+        onNavCurrentMonth: function () {
+            sap.ui.core.UIComponent.getRouterFor(this).navTo("RouteCurrentMonth", {}, true);
+        },
+
+        onNavYearReport: function () {
+            sap.ui.core.UIComponent.getRouterFor(this).navTo("RouteYearReport", {}, true);
         }
     });
 });

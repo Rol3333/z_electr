@@ -202,13 +202,54 @@ sap.ui.define([
          */
         function readRefComponents(selection) {
             var lastDay = new Date(Date.UTC(selection.year, selection.month, 0)).getUTCDate();
-            var filter = "plant eq '" + escapeLiteral(selection.plant) + "'" +
-                " and pos eq '" + escapeLiteral(selection.pos) + "'" +
-                " and valid_date ge " + dateTimeLiteral(selection.year, selection.month, 1) +
-                " and valid_date le " + dateTimeLiteral(selection.year, selection.month, lastDay);
+            return readRefComponentsRange(selection.plant, selection.pos,
+                selection.year + "-" + String(selection.month).padStart(2, "0") + "-01",
+                selection.year + "-" + String(selection.month).padStart(2, "0") + "-" + String(lastDay).padStart(2, "0"));
+        }
+
+        /**
+         * Reads backend parsed components for a plant (optionally one
+         * position) over an ISO date range.
+         *
+         * @param {string} plant plant id
+         * @param {string|null} pos position id or null for all positions
+         * @param {string} fromDate "yyyy-MM-dd"
+         * @param {string} toDate "yyyy-MM-dd"
+         * @returns {Promise<object[]>} raw component rows
+         */
+        function readRefComponentsRange(plant, pos, fromDate, toDate) {
+            var from = parseIso(fromDate);
+            var to = parseIso(toDate);
+            var filter = "plant eq '" + escapeLiteral(plant) + "'" +
+                (pos ? " and pos eq '" + escapeLiteral(pos) + "'" : "") +
+                " and valid_date ge " + dateTimeLiteral(from.year, from.month, from.day) +
+                " and valid_date le " + dateTimeLiteral(to.year, to.month, to.day);
             return readAll("/Z_C_ELECR_VALIDATE_REF", {
                 $filter: filter,
                 $select: "plant,pos,valid_date,manual_entry,seq,sign,ref_position,multiplier,divisor,UnitOfMeasure,RefSuggestedValue,RefAdjustedValue,Contribution,RefStatus",
+                $format: "json"
+            });
+        }
+
+        /**
+         * Reads ALL source rows (Z_I_ELECR_CNTR) of a plant over an ISO date
+         * range (no position filter) - used by the all-positions report.
+         *
+         * @param {string} plant plant id
+         * @param {string} fromDate "yyyy-MM-dd"
+         * @param {string} toDate "yyyy-MM-dd"
+         * @param {string[]} selectFields property names to request
+         * @returns {Promise<object[]>} raw source rows
+         */
+        function readSourceRowsRange(plant, fromDate, toDate, selectFields) {
+            var from = parseIso(fromDate);
+            var to = parseIso(toDate);
+            var filter = "Plant eq '" + escapeLiteral(plant) + "'" +
+                " and ValidDate ge " + dateTimeLiteral(from.year, from.month, from.day) +
+                " and ValidDate le " + dateTimeLiteral(to.year, to.month, to.day);
+            return readAll("/Z_I_ELECR_CNTR", {
+                $filter: filter,
+                $select: (selectFields || []).join(","),
                 $format: "json"
             });
         }
@@ -327,7 +368,9 @@ sap.ui.define([
         return {
             readParents: readParents,
             readRefComponents: readRefComponents,
+            readRefComponentsRange: readRefComponentsRange,
             readSourceRows: readSourceRows,
+            readSourceRowsRange: readSourceRowsRange,
             buildSourceIndex: buildSourceIndex,
             toDecimal: toDecimal,
             toIsoDate: toIsoDate

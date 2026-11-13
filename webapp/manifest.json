@@ -99,6 +99,34 @@
       },
       "routes": [
         {
+          "name": "RouteFormulaTest",
+          "pattern": "formula-test",
+          "target": [
+            "TargetView1"
+          ]
+        },
+        {
+          "name": "RouteCurrentMonth",
+          "pattern": "current-month",
+          "target": [
+            "TargetCurrentMonth"
+          ]
+        },
+        {
+          "name": "RouteYearReportPos",
+          "pattern": "year-report/{pos}",
+          "target": [
+            "TargetYearReport"
+          ]
+        },
+        {
+          "name": "RouteYearReport",
+          "pattern": "year-report",
+          "target": [
+            "TargetYearReport"
+          ]
+        },
+        {
           "name": "RouteView1",
           "pattern": ":?query:",
           "target": [
@@ -110,6 +138,14 @@
         "TargetView1": {
           "id": "View1",
           "name": "View1"
+        },
+        "TargetCurrentMonth": {
+          "id": "CurrentMonth",
+          "name": "CurrentMonth"
+        },
+        "TargetYearReport": {
+          "id": "PositionYear",
+          "name": "PositionYear"
         }
       }
     },

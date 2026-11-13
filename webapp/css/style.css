@@ -52,3 +52,11 @@
     margin-right: 2rem;
     margin-bottom: 0.25rem;
 }
+
+.zeNavStrip {
+    margin-bottom: 0.5rem;
+}
+
+.zeNavStrip .sapMBtn {
+    margin-right: 0.5rem;
+}
