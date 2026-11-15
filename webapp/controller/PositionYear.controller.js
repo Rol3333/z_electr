@@ -60,18 +60,20 @@ sap.ui.define([
             this._posInput = new Input({ maxLength: 15, width: "12rem", placeholder: this._text("positionPlaceholder") });
             this._yearInput = new Input({ type: "Number", width: "8rem" });
             this._notesCheckBox = new CheckBox({ text: this._text("pyShowNotes") });
+            var oContent = new VBox({
+                items: [
+                    new Label({ text: this._text("pyPosition"), labelFor: this._posInput }),
+                    this._posInput,
+                    new Label({ text: this._text("pyYear"), labelFor: this._yearInput }),
+                    this._yearInput,
+                    this._notesCheckBox
+                ]
+            });
+            oContent.addStyleClass("zePromptContent");
             this._promptDialog = new Dialog({
                 title: this._text("pyPromptTitle"),
-                contentWidth: "22rem",
-                content: new VBox({
-                    items: [
-                        new Label({ text: this._text("pyPosition"), labelFor: this._posInput }),
-                        this._posInput,
-                        new Label({ text: this._text("pyYear"), labelFor: this._yearInput }),
-                        this._yearInput,
-                        this._notesCheckBox
-                    ]
-                }),
+                contentWidth: "24rem",
+                content: oContent,
                 beginButton: new Button({
                     text: this._text("dlgRun"),
                     type: "Emphasized",

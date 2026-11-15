@@ -49,25 +49,49 @@ sap.ui.define([
 
             this._createPromptDialog();
 
-            // open the prompt on first display (period defaults to current month)
-            this._promptDialog.open();
+            // open the prompt every time the report is entered (same proven
+            // mechanism as the 12-month overview: route matched -> dialog)
+            UIComponent.getRouterFor(this)
+                .getRoute("RouteCurrentMonth")
+                .attachPatternMatched(this._onRouteMatched, this);
+        },
+
+        /**
+         * Opens the prompt when the report route is matched (direct URL,
+         * nav strip or FLP tile). The open is deferred with setTimeout so it
+         * runs after the navigation transition starts; the dialog renders
+         * itself into the static UI area, so the view state does not matter.
+         */
+        _onRouteMatched: function () {
+            var self = this;
+            setTimeout(function () {
+                try {
+                    if (self._promptDialog && !self._promptDialog.isOpen()) {
+                        self._promptDialog.open();
+                    }
+                } catch (e) {
+                    console.error("Failed to open the Monthly report prompt", e);
+                }
+            }, 0);
         },
 
         _createPromptDialog: function () {
             var self = this;
             this._periodInput = new Input({ width: "8rem", placeholder: "YYYY.MM" });
             this._zeroCheckBox = new CheckBox({ text: this._text("cmShowZero") });
+            var oContent = new VBox({
+                items: [
+                    new Label({ text: this._text("cmPeriodLabel"), labelFor: this._periodInput }),
+                    this._periodInput,
+                    new Label({ text: this._text("cmPeriodHint") }),
+                    this._zeroCheckBox
+                ]
+            });
+            oContent.addStyleClass("zePromptContent");
             this._promptDialog = new Dialog({
                 title: this._text("cmPromptTitle"),
-                contentWidth: "22rem",
-                content: new VBox({
-                    items: [
-                        new Label({ text: this._text("cmPeriodLabel"), labelFor: this._periodInput }),
-                        this._periodInput,
-                        new Label({ text: this._text("cmPeriodHint") }),
-                        this._zeroCheckBox
-                    ]
-                }),
+                contentWidth: "24rem",
+                content: oContent,
                 beginButton: new Button({
                     text: this._text("dlgRun"),
                     type: "Emphasized",

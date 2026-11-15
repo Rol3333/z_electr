@@ -60,3 +60,12 @@
 .zeNavStrip .sapMBtn {
     margin-right: 0.5rem;
 }
+
+/* Prompt dialog content: gap between the fields and the dialog border */
+.zePromptContent {
+    padding: 0.5rem 0 0 1rem;
+}
+
+.zePromptContent .sapMLabel {
+    margin-top: 0.5rem;
+}
