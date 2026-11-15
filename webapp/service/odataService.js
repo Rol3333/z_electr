@@ -22,8 +22,9 @@
  * - GET only; the model is configured read-only in the metadata.
  */
 sap.ui.define([
-    "zelectr/parser/decimal"
-], function (Decimal) {
+    "zelectr/parser/decimal",
+    "zelectr/service/performanceDiagnostics"
+], function (Decimal, perf) {
     "use strict";
 
     var DEFAULT_CONCURRENCY = 3;
@@ -75,8 +76,10 @@ sap.ui.define([
         function readAll(sPath, mUrlParameters) {
             var params = Object.assign({}, mUrlParameters);
             var allRows = [];
+            var pageCount = 0;
 
             function readPage() {
+                var pageStart = performance.now();
                 return new Promise(function (resolve, reject) {
                     oModel.read(sPath, {
                         urlParameters: params,
@@ -92,19 +95,36 @@ sap.ui.define([
                         }
                     });
                 }).then(function (oData) {
+                    pageCount++;
+                    var pageRecords = (oData && Array.isArray(oData.results)) ? oData.results.length : 0;
                     if (oData && Array.isArray(oData.results)) {
                         allRows = allRows.concat(oData.results);
                     }
                     // server paging: follow __next via $skiptoken
                     var next = oData && oData.__next;
+                    var hasNext = false;
                     if (next) {
                         var match = /([?&])\$skiptoken=([^&]*)/.exec(next);
                         if (match) {
+                            hasNext = true;
                             params.$skiptoken = decodeURIComponent(match[2]);
-                            return readPage();
                         }
                     }
+                    // per-page diagnostics (counts/durations only, no URLs)
+                    perf.logODataPage(null, {
+                        pageIndex: pageCount,
+                        durationMs: performance.now() - pageStart,
+                        records: pageRecords,
+                        hasNext: hasNext,
+                        status: "success"
+                    });
+                    if (hasNext) {
+                        return readPage();
+                    }
                     return allRows;
+                }).catch(function (err) {
+                    perf.logError(null, "readAll page " + (pageCount + 1) + " (" + sPath + ")", err);
+                    throw err;
                 });
             }
 
@@ -171,6 +191,8 @@ sap.ui.define([
          * @returns {Promise<object>} {rows, posUsed, filter}
          */
         function readParents(selection) {
+            var opStart = performance.now();
+            var pages = 0;
             function once(pos) {
                 var lastDay = new Date(Date.UTC(selection.year, selection.month, 0)).getUTCDate();
                 var filter = "Plant eq '" + escapeLiteral(selection.plant) + "'" +
@@ -187,9 +209,38 @@ sap.ui.define([
             }
             return once(selection.pos).then(function (res) {
                 if (res.rows.length === 0 && selection.pos.toUpperCase() !== selection.pos) {
-                    return once(selection.pos.toUpperCase());
+                    // uppercase retry - make it visible in diagnostics
+                    var retryStart = performance.now();
+                    perf.logODataOperation(null, {
+                        label: "readParents (uppercase retry)",
+                        entity: "/Z_C_ELECR_VALIDATE",
+                        status: "retry",
+                        records: res.rows.length
+                    });
+                    return once(selection.pos.toUpperCase()).then(function (retryRes) {
+                        perf.logODataOperation(null, {
+                            label: "readParents (uppercase retry result)",
+                            entity: "/Z_C_ELECR_VALIDATE",
+                            durationMs: performance.now() - retryStart,
+                            records: retryRes.rows.length,
+                            status: retryRes.rows.length ? "success" : "empty"
+                        });
+                        return retryRes;
+                    });
                 }
                 return res;
+            }).then(function (res) {
+                perf.logODataOperation(null, {
+                    label: "readParents",
+                    entity: "/Z_C_ELECR_VALIDATE",
+                    durationMs: performance.now() - opStart,
+                    records: res.rows.length,
+                    status: res.rows.length ? "success" : "empty"
+                });
+                return res;
+            }).catch(function (err) {
+                perf.logError(null, "readParents", err);
+                throw err;
             });
         }
 
@@ -218,6 +269,7 @@ sap.ui.define([
          * @returns {Promise<object[]>} raw component rows
          */
         function readRefComponentsRange(plant, pos, fromDate, toDate) {
+            var opStart = performance.now();
             var from = parseIso(fromDate);
             var to = parseIso(toDate);
             var filter = "plant eq '" + escapeLiteral(plant) + "'" +
@@ -228,6 +280,18 @@ sap.ui.define([
                 $filter: filter,
                 $select: "plant,pos,valid_date,manual_entry,seq,sign,ref_position,multiplier,divisor,UnitOfMeasure,RefSuggestedValue,RefAdjustedValue,Contribution,RefStatus",
                 $format: "json"
+            }).then(function (rows) {
+                perf.logODataOperation(null, {
+                    label: "readRefComponents",
+                    entity: "/Z_C_ELECR_VALIDATE_REF",
+                    durationMs: performance.now() - opStart,
+                    records: rows.length,
+                    status: rows.length ? "success" : "empty"
+                });
+                return rows;
+            }).catch(function (err) {
+                perf.logError(null, "readRefComponents", err);
+                throw err;
             });
         }
 
@@ -242,6 +306,7 @@ sap.ui.define([
          * @returns {Promise<object[]>} raw source rows
          */
         function readSourceRowsRange(plant, fromDate, toDate, selectFields) {
+            var opStart = performance.now();
             var from = parseIso(fromDate);
             var to = parseIso(toDate);
             var filter = "Plant eq '" + escapeLiteral(plant) + "'" +
@@ -251,6 +316,18 @@ sap.ui.define([
                 $filter: filter,
                 $select: (selectFields || []).join(","),
                 $format: "json"
+            }).then(function (rows) {
+                perf.logODataOperation(null, {
+                    label: "readSourceRowsRange",
+                    entity: "/Z_I_ELECR_CNTR",
+                    durationMs: performance.now() - opStart,
+                    records: rows.length,
+                    status: rows.length ? "success" : "empty"
+                });
+                return rows;
+            }).catch(function (err) {
+                perf.logError(null, "readSourceRowsRange", err);
+                throw err;
             });
         }
 
@@ -263,6 +340,7 @@ sap.ui.define([
          * @returns {Promise<object[]>} raw source rows
          */
         function readSourceRows(params) {
+            var opStart = performance.now();
             var positions = params.positions || [];
             var chunks = [];
             for (var i = 0; i < positions.length; i += POSITIONS_PER_CHUNK) {
@@ -274,8 +352,10 @@ sap.ui.define([
                 "Plant", "Pos", "ValidDate", "ManualEntry",
                 "SuggestedQuantity", "AdjustedQuantity", "UnitOfMeasure", "Formula"
             ];
-            var fns = chunks.map(function (chunk) {
+            var failedChunks = 0;
+            var fns = chunks.map(function (chunk, chunkIndex) {
                 return function () {
+                    var chunkStart = performance.now();
                     var posFilter = chunk.map(function (p) {
                         return "Pos eq '" + escapeLiteral(p) + "'";
                     }).join(" or ");
@@ -287,11 +367,48 @@ sap.ui.define([
                         $filter: filter,
                         $select: selectFields.join(","),
                         $format: "json"
+                    }).then(function (rows) {
+                        perf.logODataChunk(null, {
+                            chunkIndex: chunkIndex + 1,
+                            chunkTotal: chunks.length,
+                            positions: chunk.length,
+                            records: rows.length,
+                            durationMs: performance.now() - chunkStart,
+                            status: "success"
+                        });
+                        return rows;
+                    }).catch(function (err) {
+                        failedChunks++;
+                        perf.logODataChunk(null, {
+                            chunkIndex: chunkIndex + 1,
+                            chunkTotal: chunks.length,
+                            positions: chunk.length,
+                            records: 0,
+                            durationMs: performance.now() - chunkStart,
+                            status: "failed"
+                        });
+                        throw err;
                     });
                 };
             });
             return runWithConcurrency(fns, DEFAULT_CONCURRENCY).then(function (chunkResults) {
-                return [].concat.apply([], chunkResults);
+                var allRows = [].concat.apply([], chunkResults);
+                perf.logODataOperation(null, {
+                    label: "readSourceRows",
+                    entity: "/Z_I_ELECR_CNTR",
+                    durationMs: performance.now() - opStart,
+                    records: allRows.length,
+                    pages: undefined,
+                    chunks: chunks.length,
+                    chunkSize: POSITIONS_PER_CHUNK,
+                    concurrency: DEFAULT_CONCURRENCY,
+                    positions: positions.length,
+                    status: failedChunks ? "partial (" + failedChunks + " failed chunks)" : "success"
+                });
+                return allRows;
+            }).catch(function (err) {
+                perf.logError(null, "readSourceRows", err);
+                throw err;
             });
         }
 

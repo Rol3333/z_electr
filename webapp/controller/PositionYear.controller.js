@@ -18,7 +18,9 @@ sap.ui.define([
     "sap/ui/core/UIComponent",
     "sap/ui/model/json/JSONModel",
     "zelectr/service/positionReportService",
+    "zelectr/service/performanceDiagnostics",
     "zelectr/formatter/numberFormatter",
+    "zelectr/formatter/exportHelper",
     "sap/m/MessageBox",
     "sap/m/Dialog",
     "sap/m/VBox",
@@ -26,8 +28,8 @@ sap.ui.define([
     "sap/m/Input",
     "sap/m/CheckBox",
     "sap/m/Button"
-], function (Controller, UIComponent, JSONModel, positionReportService,
-    numberFormatter, MessageBox, Dialog, VBox, Label, Input, CheckBox, Button) {
+], function (Controller, UIComponent, JSONModel, positionReportService, perf,
+    numberFormatter, exportHelper, MessageBox, Dialog, VBox, Label, Input, CheckBox, Button) {
     "use strict";
 
     return Controller.extend("zelectr.controller.PositionYear", {
@@ -72,7 +74,8 @@ sap.ui.define([
             oContent.addStyleClass("zePromptContent");
             this._promptDialog = new Dialog({
                 title: this._text("pyPromptTitle"),
-                contentWidth: "24rem",
+                contentWidth: "34rem",
+                contentHeight: "16rem",
                 content: oContent,
                 beginButton: new Button({
                     text: this._text("dlgRun"),
@@ -118,6 +121,8 @@ sap.ui.define([
             this._showNotes = this._notesCheckBox.getSelected();
             this._viewModel.setProperty("/showNotes", this._showNotes);
 
+            var run = perf.beginReportRun("YEAR_REPORT", { plant: "2010", pos: sPos, year: year });
+
             // clear stale data before new requests are issued
             this._viewModel.setProperty("/months", []);
             this._viewModel.setProperty("/hasDetail", false);
@@ -128,9 +133,11 @@ sap.ui.define([
                 .then(function (report) {
                     self._months = report.months;
                     self._present(report);
+                    perf.endReportRun(run, "success", { outputRows: report.months.length });
                     oView.setBusy(false);
                 })
                 .catch(function (err) {
+                    perf.endReportRun(run, "failed");
                     oView.setBusy(false);
                     MessageBox.error("Year report failed\n" +
                         (err && err.message ? err.message : err));
@@ -244,6 +251,28 @@ sap.ui.define([
                 parseText: parse,
                 comparison: comparison
             };
+        },
+
+        /**
+         * Exports the 12 monthly rows the user sees (Notes included only
+         * when the "Show notes" option is set) to an Excel-compatible CSV.
+         */
+        onExportExcel: function () {
+            var columns = [
+                { label: this._text("colMonth"), key: "monthLabel" },
+                { label: this._text("colAdjJs"), key: "adjJs" },
+                { label: this._text("colSugJs"), key: "sugJs" },
+                { label: this._text("colAdjAbap"), key: "adjAbap" },
+                { label: this._text("colSugAbap"), key: "sugAbap" },
+                { label: this._text("colUom"), key: "uom" },
+                { label: this._text("colStatus"), key: "status" }
+            ];
+            if (this._showNotes) {
+                columns.push({ label: this._text("colNotes"), key: "notesText" });
+            }
+            var sPos = (this._posInput.getValue() || "").trim();
+            var sYear = (this._yearInput.getValue() || "").trim();
+            exportHelper.exportCsv("year-report_" + sPos + "_" + sYear, columns, this._months || []);
         },
 
         _text: function (sKey) {

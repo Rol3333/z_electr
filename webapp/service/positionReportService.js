@@ -33,11 +33,12 @@
  */
 sap.ui.define([
     "zelectr/service/odataService",
+    "zelectr/service/performanceDiagnostics",
     "zelectr/parser/formulaParser",
     "zelectr/calculation/formulaEvaluator",
     "zelectr/calculation/monthlyAggregator",
     "zelectr/parser/decimal"
-], function (odataService, formulaParser, formulaEvaluator, monthlyAggregator, Decimal) {
+], function (odataService, perf, formulaParser, formulaEvaluator, monthlyAggregator, Decimal) {
     "use strict";
 
     // Internal configuration constant - NOT a user-facing parameter (brief 2.4)
@@ -524,6 +525,7 @@ sap.ui.define([
                             });
 
                             // phase 3: unique reference positions across all formulas
+                            var collectTimer = perf.startStage(null, "Collect reference positions");
                             var refPositions = [];
                             byPos.forEach(function (posRows, pos) {
                                 posRows.forEach(function (r) {
@@ -540,6 +542,7 @@ sap.ui.define([
                                     }
                                 });
                             });
+                            perf.endStage(collectTimer, { positions: refPositions.length });
 
                             var refFetch;
                             if (refPositions.length === 0) {
@@ -557,8 +560,11 @@ sap.ui.define([
                                 // buildSourceIndex expects RAW OData rows and does its
                                 // own normalization (double-normalizing here would drop
                                 // ValidDate and crash toIsoDate)
+                                var indexTimer = perf.startStage(null, "Build source index");
                                 var refIndex = service.buildSourceIndex(refRawRows);
+                                perf.endStage(indexTimer, { rows: refRawRows.length });
 
+                                var calcTimer = perf.startStage(null, "Calculate positions");
                                 var reportRows = [];
                                 byPos.forEach(function (posRows, pos) {
                                     var calc = calculatePositionPeriod({
@@ -577,6 +583,7 @@ sap.ui.define([
                                     }
                                     reportRows.push(calc);
                                 });
+                                perf.endStage(calcTimer, { positions: reportRows.length });
 
                                 // sort by workshop, then position
                                 reportRows.sort(function (a, b) {

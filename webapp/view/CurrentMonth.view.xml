@@ -3,11 +3,12 @@
     xmlns="sap.m">
     <Page id="currentMonthPage" title="{i18n>cmTitle}" showNavButton="false">
         <headerContent>
+            <Button icon="sap-icon://excel-attachment" tooltip="{i18n>exportExcel}" press=".onExportExcel"/>
             <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh"/>
             <Button icon="sap-icon://filter" tooltip="{i18n>cmParameters}" press=".onOpenPrompt"/>
         </headerContent>
         <content>
-            <VBox class="zeMain">
+            <VBox class="zeMain" width="100%">
                 <HBox wrap="Wrap" alignItems="Center" class="zeNavStrip">
                     <Button text="{i18n>navFormulaTest}" press=".onNavFormulaTest"/>
                     <Button text="{i18n>navCurrentMonth}" type="Emphasized" press=".onNavCurrentMonth"/>
@@ -28,7 +29,7 @@
                 </HBox>
 
                 <Table id="positionsTable" items="{path: 'vm>/rows'}" mode="SingleSelectMaster"
-                    selectionChange=".onRowSelected" growing="true" growingThreshold="50"
+                    selectionChange=".onRowSelected" fixedLayout="Strict" width="100%"
                     noDataText="{i18n>cmNoData}">
                     <columns>
                         <Column width="8rem"><header><Text text="{i18n>colWorkshop}"/></header></Column>

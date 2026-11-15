@@ -2,6 +2,8 @@
 
 .zeMain {
     padding: 0.5rem;
+    /* stretch the report content to the full page width */
+    width: 100%;
 }
 
 .zePanel {

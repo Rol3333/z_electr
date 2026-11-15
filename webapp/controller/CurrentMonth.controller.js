@@ -16,7 +16,9 @@ sap.ui.define([
     "sap/ui/core/UIComponent",
     "sap/ui/model/json/JSONModel",
     "zelectr/service/positionReportService",
+    "zelectr/service/performanceDiagnostics",
     "zelectr/formatter/numberFormatter",
+    "zelectr/formatter/exportHelper",
     "sap/m/MessageBox",
     "sap/m/Dialog",
     "sap/m/VBox",
@@ -24,8 +26,8 @@ sap.ui.define([
     "sap/m/Input",
     "sap/m/CheckBox",
     "sap/m/Button"
-], function (Controller, UIComponent, JSONModel, positionReportService,
-    numberFormatter, MessageBox, Dialog, VBox, Label, Input, CheckBox, Button) {
+], function (Controller, UIComponent, JSONModel, positionReportService, perf,
+    numberFormatter, exportHelper, MessageBox, Dialog, VBox, Label, Input, CheckBox, Button) {
     "use strict";
 
     return Controller.extend("zelectr.controller.CurrentMonth", {
@@ -90,7 +92,8 @@ sap.ui.define([
             oContent.addStyleClass("zePromptContent");
             this._promptDialog = new Dialog({
                 title: this._text("cmPromptTitle"),
-                contentWidth: "24rem",
+                contentWidth: "34rem",
+                contentHeight: "14rem",
                 content: oContent,
                 beginButton: new Button({
                     text: this._text("dlgRun"),
@@ -132,14 +135,20 @@ sap.ui.define([
             }
             this._showZero = this._zeroCheckBox.getSelected();
 
+            var run = perf.beginReportRun("CURRENT_MONTH", {
+                plant: "2010",
+                period: year + "-" + String(month).padStart(2, "0")
+            });
             oView.setBusy(true);
             this._reportService.buildCurrentMonthReport({ year: year, month: month })
                 .then(function (report) {
                     self._rows = report.rows;
                     self._present(report);
+                    perf.endReportRun(run, "success", { outputRows: report.rows.length });
                     oView.setBusy(false);
                 })
                 .catch(function (err) {
+                    perf.endReportRun(run, "failed");
                     oView.setBusy(false);
                     MessageBox.error("Monthly report failed\n" +
                         (err && err.message ? err.message : err));
@@ -150,6 +159,12 @@ sap.ui.define([
             var fmt = numberFormatter;
             var caps = report.caps || {};
             var self = this;
+
+            console.table(report.rows.slice(0, 10).map(r => ({
+                position: r.pos,
+                workshop: r.workshop,
+                description: r.descr
+            })));
 
             var rows = report.rows.map(function (r) {
                 return {
@@ -178,6 +193,16 @@ sap.ui.define([
                     return !self._isZeroRow(r);
                 });
             }
+            
+            //tmp output to console for debugging
+            console.table(rows.map(function (r) {
+            return {
+                Position: r.pos,
+                Workshop: r.workshop,
+                Description: r.descr
+            };
+            }));
+
 
             this._viewModel.setProperty("/rows", rows);
             this._viewModel.setProperty("/hasPastMeasurement", !!caps.pastMeasurement);
@@ -248,6 +273,45 @@ sap.ui.define([
             }
             var sPos = oCtx.getProperty("pos");
             UIComponent.getRouterFor(this).navTo("RouteYearReportPos", { pos: encodeURIComponent(sPos) });
+        },
+
+        /**
+         * Exports the data the user currently sees (zero-amount filter and
+         * search applied) to an Excel-compatible CSV download.
+         */
+        onExportExcel: function () {
+            var self = this;
+            var columns = [
+                { label: this._text("colWorkshop"), key: "workshop" },
+                { label: this._text("colPos"), key: "pos" },
+                { label: this._text("colPosDescr"), key: "descr" },
+                { label: this._text("colAdjJs"), key: "adjJs" },
+                { label: this._text("colSugJs"), key: "sugJs" },
+                { label: this._text("colAdjAbap"), key: "adjAbap" },
+                { label: this._text("colSugAbap"), key: "sugAbap" },
+                { label: this._text("colUom"), key: "uom" },
+                { label: this._text("colPastMeasurement"), key: "pastMeasurement" },
+                { label: this._text("colFormula"), key: "formula" },
+                { label: this._text("colStatus"), key: "status" },
+                { label: this._text("colNotes"), key: "notesText" }
+            ];
+            // apply the same filters as the visible table: zero-amount
+            // filter + search field
+            var sQuery = (this.byId("searchField").getValue() || "").toLowerCase();
+            var rows = (this._rows || []).filter(function (r) {
+                if (!self._showZero && self._isZeroRow(r)) {
+                    return false;
+                }
+                if (sQuery) {
+                    var hay = [r.pos, r.workshop, r.descr, r.formula].join(" ").toLowerCase();
+                    if (hay.indexOf(sQuery) < 0) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+            var period = (this._periodInput.getValue() || "").replace(/[^0-9]/g, "");
+            exportHelper.exportCsv("monthly-report_" + period, columns, rows);
         },
 
         onNavFormulaTest: function () {

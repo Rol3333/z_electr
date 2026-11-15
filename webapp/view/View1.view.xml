@@ -4,7 +4,7 @@
     xmlns="sap.m">
     <Page id="page" title="{i18n>title}" showNavButton="false">
         <content>
-            <VBox class="zeMain">
+            <VBox class="zeMain" width="100%">
                 <HBox wrap="Wrap" alignItems="Center" class="zeNavStrip">
                     <Button text="{i18n>navFormulaTest}" type="Emphasized" press=".onNavFormulaTest"/>
                     <Button text="{i18n>navCurrentMonth}" press=".onNavCurrentMonth"/>

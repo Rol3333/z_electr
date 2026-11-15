@@ -18,6 +18,7 @@ sap.ui.define([
     "sap/ui/core/mvc/Controller",
     "zelectr/model/models",
     "zelectr/service/odataService",
+    "zelectr/service/performanceDiagnostics",
     "zelectr/parser/formulaParser",
     "zelectr/calculation/referenceResolver",
     "zelectr/calculation/calculationEngine",
@@ -26,7 +27,7 @@ sap.ui.define([
     "zelectr/formatter/statusFormatter",
     "zelectr/parser/decimal",
     "sap/m/MessageBox"
-], function (Controller, models, odataService, formulaParser, referenceResolver,
+], function (Controller, models, odataService, perf, formulaParser, referenceResolver,
     calculationEngine, monthlyAggregator, numberFormatter, statusFormatter, Decimal, MessageBox) {
     "use strict";
 
@@ -82,6 +83,12 @@ sap.ui.define([
             var strategy = referenceResolver.getStrategyById(strategyId) || this._strategies[0];
             var self = this;
 
+            var run = perf.beginReportRun("FORMULA_TEST", {
+                plant: plant,
+                pos: pos,
+                month: year + "-" + String(month).padStart(2, "0")
+            });
+
             this._service.readParents(selection)
                 .then(function (res) {
                     selection.posUsed = res.posUsed;
@@ -90,11 +97,15 @@ sap.ui.define([
                 })
                 .then(function (context) {
                     self._present(selection, context, manualFilter, strategy);
+                    perf.endReportRun(run, "success", {
+                        outputRows: (context.parentRows || []).length
+                    });
                     self._viewModel.setProperty("/busy", false);
                     self._viewModel.setProperty("/canLoad", true);
                     oView.setBusy(false);
                 })
                 .catch(function (err) {
+                    perf.endReportRun(run, "failed");
                     self._viewModel.setProperty("/busy", false);
                     self._viewModel.setProperty("/canLoad", true);
                     oView.setBusy(false);

@@ -4,11 +4,12 @@
     <Page id="positionYearPage" title="{i18n>pyTitle}" showNavButton="true"
         navButtonPress=".onNavBack">
         <headerContent>
+            <Button icon="sap-icon://excel-attachment" tooltip="{i18n>exportExcel}" press=".onExportExcel"/>
             <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onLoad"/>
             <Button icon="sap-icon://filter" tooltip="{i18n>pyParameters}" press=".onOpenPrompt"/>
         </headerContent>
         <content>
-            <VBox class="zeMain">
+            <VBox class="zeMain" width="100%">
                 <HBox wrap="Wrap" alignItems="Center" class="zeNavStrip">
                     <Button text="{i18n>navFormulaTest}" press=".onNavFormulaTest"/>
                     <Button text="{i18n>navCurrentMonth}" press=".onNavCurrentMonth"/>
@@ -22,7 +23,8 @@
                 <Text text="{vm>/capabilityText}" class="zeHint"/>
 
                 <Table id="yearTable" items="{vm>/months}" mode="SingleSelectMaster"
-                    selectionChange=".onMonthSelected" noDataText="{i18n>pyNoData}">
+                    selectionChange=".onMonthSelected" fixedLayout="false" width="100%"
+                    noDataText="{i18n>pyNoData}">
                     <columns>
                         <Column width="9rem"><header><Text text="{i18n>colMonth}"/></header></Column>
                         <Column width="9rem" hAlign="End"><header><Text text="{i18n>colAdjJs}" tooltip="{i18n>ttAdjJs}"/></header></Column>

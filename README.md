@@ -64,6 +64,44 @@ The parser and calculation modules are also plain JavaScript and can be exercise
 - calculation withholding on missing/ambiguous references and UOM mismatch;
 - monthly aggregation refusal while the `P()` period rule is unconfirmed.
 
+## Performance diagnostics (v0.3)
+
+Client-side performance instrumentation to identify where report loading time is spent (OData reads/pages/chunks vs JavaScript processing). **Observational only** — no retrieval, calculation or UI behaviour changes; with diagnostics disabled (the default) nothing is printed and behaviour is unchanged.
+
+### Enabling
+
+Append the URL flag **before the hash** (per browser session, no persistent storage):
+
+```text
+http://localhost:8080/index.html?debugPerf=1#/current-month
+http://localhost:8080/index.html?debugPerf=1#/year-report
+http://localhost:8080/index.html?debugPerf=1#/formula-test
+```
+
+### Reading the console output
+
+Open the browser **developer console** (F12) and run a report. Each run gets a unique ID and a collapsed group:
+
+```text
+[PERF][run-0007][CURRENT_MONTH] REPORT LOAD START
+  Started 2026-11-15T19:15:03.125Z | Context: plant=2010, period=2026-11
+  [ODATA][run-0007] readParents | entity=/Z_C_ELECR_VALIDATE | duration=1,840 ms | records=250 | status=success
+  [ODATA][run-0007] page 1: 120.5 ms, records=250, continuation=no, status=success
+  [ODATA][run-0007] readSourceRows | entity=/Z_I_ELECR_CNTR | duration=12,450 ms | records=8,450 | chunks=18 (size 8, concurrency 3) | unique positions=137 | status=success
+  [ODATA][run-0007] chunk 1/18: 8 positions, 470 records, 610.2 ms, pages=1, status=success
+  [PERF][run-0007][CURRENT_MONTH] Build source index: 340.1 ms (rows=8450)
+  [PERF][run-0007][CURRENT_MONTH] Calculate positions: 180.4 ms (positions=137)
+  Total wall time: 15,685.2 ms
+  OData logical operations: 3 | pages: 20 | records: 8,450 | source chunks: 18 | failed operations: 0 | outcome: success
+```
+
+- `[ODATA]` lines = logical service operations, per OData **page** (`__next` continuation) and per source-position **chunk** — counts and durations only, never payloads, formulas, quantities or URLs;
+- `[PERF]` lines = JavaScript processing stages (reference-position collection, source index, per-position calculation) and the report run summary;
+- report labels: `CURRENT_MONTH`, `YEAR_REPORT`, `FORMULA_TEST`;
+- failed pages/chunks/operations are logged as failures and counted in the summary; the original error behaviour is preserved.
+
+**Note:** the browser **Network** panel (and SAP Gateway traces) remain the source of truth for actual HTTP exchanges — logical reads and HTTP requests are not the same thing (one read can span several pages/chunks).
+
 ## Building / deploying
 
 ```bash
