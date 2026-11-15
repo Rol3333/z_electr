@@ -89,12 +89,28 @@ sap.ui.define([
             };
             try {
                 var meta = oModel.getServiceMetadata();
-                var schemas = (meta && meta.dataServices && meta.dataServices.schema) || [];
+                // the v2 model metadata JSON can appear either wrapped
+                // ({ dataServices: { schema: [...] } }) or directly
+                // ({ schema: [...] }) depending on the model version -
+                // handle both instead of silently finding nothing
+                var dataServices = (meta && meta.dataServices) ? meta.dataServices : meta;
+                var schemas = (dataServices && dataServices.schema) || [];
+                if (!Array.isArray(schemas)) {
+                    schemas = [schemas];
+                }
                 var cntrProps = [];
                 schemas.forEach(function (s) {
-                    (s.entityType || []).forEach(function (et) {
+                    var entityTypes = s.entityType || [];
+                    if (!Array.isArray(entityTypes)) {
+                        entityTypes = [entityTypes];
+                    }
+                    entityTypes.forEach(function (et) {
                         if (et.name === "Z_I_ELECR_CNTRType") {
-                            (et.property || []).forEach(function (p) {
+                            var props = et.property || [];
+                            if (!Array.isArray(props)) {
+                                props = [props];
+                            }
+                            props.forEach(function (p) {
                                 cntrProps.push(p.name);
                             });
                         }
@@ -112,8 +128,12 @@ sap.ui.define([
                 // if exactly one description-like property exists; never guess
                 var descr = cntrProps.filter(function (n) { return /descr/i.test(n); });
                 caps.posDescr = descr.length === 1 ? descr[0] : null;
+                // diagnostic: visible in the browser console when the
+                // optional fields are missing from the live service metadata
+                console.log("zelectr: Z_I_ELECR_CNTR capabilities", JSON.stringify(caps));
             } catch (e) {
                 // metadata not (yet) available - all optional fields unknown
+                console.warn("zelectr: service metadata not readable - optional fields unknown", e);
             }
             return caps;
         }
@@ -142,6 +162,8 @@ sap.ui.define([
                 var dateIso = service.toIsoDate(r.ValidDate);
                 var manual = r.ManualEntry === true;
                 var key = [r.Plant, r.Pos, dateIso, manual ? "true" : "false"].join("|");
+                // optional fields are requested under their exact metadata
+                // names; read them directly (with the detected-name override)
                 var row = {
                     key: key,
                     plant: r.Plant,
@@ -153,15 +175,63 @@ sap.ui.define([
                     suggested: service.toDecimal(r.SuggestedQuantity),
                     uom: r.UnitOfMeasure || null,
                     formula: r.Formula == null ? "" : String(r.Formula),
-                    workshop: caps.mainWorkshop ? (r[caps.mainWorkshop] || "") : "",
-                    descr: caps.posDescr ? (r[caps.posDescr] || "") : "",
-                    pastMeasurement: caps.pastMeasurement && r[caps.pastMeasurement] != null
-                        ? String(r[caps.pastMeasurement]) : null,
+                    workshop: (caps.mainWorkshop ? r[caps.mainWorkshop] : null) || r.MainWorkshop || "",
+                    descr: (caps.posDescr ? r[caps.posDescr] : null) || r.PositionDescription || "",
+                    pastMeasurement: r.PastMeasurement != null ? String(r.PastMeasurement) : null,
                     raw: r
                 };
                 rowCache.set(key, row);
                 return row;
             });
+        }
+
+        /**
+         * Reads source rows with the optional fields (MainWorkshop,
+         * PositionDescription, PastMeasurement) included in $select. If the
+         * service rejects them (property not supported), the read is retried
+         * once with the base fields only - so the report works against both
+         * the updated and the old projection without failing.
+         */
+        function readSourceRowsWithOptional(params, caps) {
+            var optional = ["MainWorkshop"];
+            if (caps.posDescr && optional.indexOf(caps.posDescr) < 0) {
+                optional.push(caps.posDescr);
+            } else if (optional.indexOf("PositionDescription") < 0) {
+                optional.push("PositionDescription");
+            }
+            if (caps.pastMeasurement && optional.indexOf(caps.pastMeasurement) < 0) {
+                optional.push(caps.pastMeasurement);
+            } else if (optional.indexOf("PastMeasurement") < 0) {
+                optional.push("PastMeasurement");
+            }
+            var base = ["Plant", "Pos", "ValidDate", "ManualEntry",
+                "SuggestedQuantity", "AdjustedQuantity", "UnitOfMeasure", "Formula"];
+            var withOptional = base.concat(optional);
+            return service.readSourceRows(Object.assign({}, params, { selectFields: withOptional }))
+                .catch(function () {
+                    return service.readSourceRows(Object.assign({}, params, { selectFields: base }));
+                });
+        }
+
+        /** Same fallback logic for the all-positions range read. */
+        function readSourceRowsRangeWithOptional(plant, fromDate, toDate, caps) {
+            var optional = ["MainWorkshop"];
+            if (caps.posDescr && optional.indexOf(caps.posDescr) < 0) {
+                optional.push(caps.posDescr);
+            } else if (optional.indexOf("PositionDescription") < 0) {
+                optional.push("PositionDescription");
+            }
+            if (caps.pastMeasurement && optional.indexOf(caps.pastMeasurement) < 0) {
+                optional.push(caps.pastMeasurement);
+            } else if (optional.indexOf("PastMeasurement") < 0) {
+                optional.push("PastMeasurement");
+            }
+            var base = ["Plant", "Pos", "ValidDate", "ManualEntry",
+                "SuggestedQuantity", "AdjustedQuantity", "UnitOfMeasure", "Formula"];
+            return service.readSourceRowsRange(plant, fromDate, toDate, base.concat(optional))
+                .catch(function () {
+                    return service.readSourceRowsRange(plant, fromDate, toDate, base);
+                });
         }
 
         function rowsByPosition(rows) {
@@ -221,10 +291,17 @@ sap.ui.define([
                 return out;
             }
 
-            // display attributes from the latest row
+            // display attributes: last non-empty workshop/description in the
+            // period (the last row may not carry them on every position)
             var lastRow = inRange[inRange.length - 1];
-            out.workshop = lastRow.workshop || "";
-            out.descr = lastRow.descr || "";
+            inRange.forEach(function (r) {
+                if (!out.workshop && r.workshop) {
+                    out.workshop = r.workshop;
+                }
+                if (!out.descr && r.descr) {
+                    out.descr = r.descr;
+                }
+            });
             out.uom = lastRow.uom || "";
             out.pastMeasurement = lastRow.pastMeasurement;
             if (!params.descrNotExposed && !out.descr && params.caps && params.caps.metadataAvailable && !params.caps.posDescr) {
@@ -399,7 +476,7 @@ sap.ui.define([
             var caps = detectCapabilities();
             var descrNotExposed = caps.metadataAvailable && !caps.posDescr;
 
-            return service.readSourceRowsRange(PLANT, contextStart, range.end, sourceSelectFields(caps))
+            return readSourceRowsRangeWithOptional(PLANT, contextStart, range.end, caps)
                 .then(function (rawRows) {
                     var rows = normalizeSourceRows(rawRows, caps);
                     var byPos = rowsByPosition(rows);
@@ -557,13 +634,14 @@ sap.ui.define([
             var caps = detectCapabilities();
             var descrNotExposed = caps.metadataAvailable && !caps.posDescr;
 
-            // the position's own rows for the whole year (+ opening context)
-            return service.readSourceRows({
+            // the position's own rows for the whole year (+ opening context);
+            // optional fields included with fallback for old projections
+            return readSourceRowsWithOptional({
                 plant: PLANT,
                 positions: [pos],
                 fromDate: contextStart,
                 toDate: yearEnd
-            }).then(function (rawRows) {
+            }, caps).then(function (rawRows) {
                 var posRows = normalizeSourceRows(rawRows, caps);
                 var byMonth = new Map();
                 posRows.forEach(function (r) {

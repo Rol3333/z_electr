@@ -270,6 +270,10 @@ sap.ui.define([
             }
             var from = parseIso(params.fromDate);
             var to = parseIso(params.toDate);
+            var selectFields = params.selectFields || [
+                "Plant", "Pos", "ValidDate", "ManualEntry",
+                "SuggestedQuantity", "AdjustedQuantity", "UnitOfMeasure", "Formula"
+            ];
             var fns = chunks.map(function (chunk) {
                 return function () {
                     var posFilter = chunk.map(function (p) {
@@ -281,7 +285,7 @@ sap.ui.define([
                         " and ValidDate le " + dateTimeLiteral(to.year, to.month, to.day);
                     return readAll("/Z_I_ELECR_CNTR", {
                         $filter: filter,
-                        $select: "Plant,Pos,ValidDate,ManualEntry,SuggestedQuantity,AdjustedQuantity,UnitOfMeasure,Formula",
+                        $select: selectFields.join(","),
                         $format: "json"
                     });
                 };

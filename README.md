@@ -29,6 +29,24 @@ npm run start-local  # uses ui5-local.yaml
 npm run start-mock   # uses the local mock server (no backend needed)
 ```
 
+### Direct report URLs (local dev server, default port 8080)
+
+Each report is directly addressable — no home page visit needed. The UI language is selected with the `sap-language` URL parameter (`EN` or `LT`), which also follows the Fiori Launchpad user profile language when the app runs in the FLP:
+
+| Report | English (`sap-language=EN`) | Lithuanian (`sap-language=LT`) |
+|---|---|---|
+| Formula test | `http://localhost:8080/index.html?sap-language=EN#/formula-test` | `http://localhost:8080/index.html?sap-language=LT#/formula-test` |
+| Monthly — all positions | `http://localhost:8080/index.html?sap-language=EN#/current-month` | `http://localhost:8080/index.html?sap-language=LT#/current-month` |
+| Position — 12-month overview | `http://localhost:8080/index.html?sap-language=EN#/year-report` | `http://localhost:8080/index.html?sap-language=LT#/year-report` |
+| 12-month overview, position prefilled | `http://localhost:8080/index.html?sap-language=EN#/year-report/bE24X` | `http://localhost:8080/index.html?sap-language=LT#/year-report/bE24X` |
+
+In the FLP preview (`test/flp.html`) the same destinations are reached through the inner hash, e.g.:
+
+- `http://localhost:8080/test/flp.html?sap-language=EN#app-preview&/current-month`
+- `http://localhost:8080/test/flp.html?sap-language=LT#app-preview&/current-month`
+- `http://localhost:8080/test/flp.html?sap-language=EN#app-preview&/year-report`
+- `http://localhost:8080/test/flp.html?sap-language=LT#app-preview&/year-report`
+
 ## Running the tests
 
 ```bash
@@ -83,17 +101,19 @@ webapp/
 
 The application now contains **three directly addressable destinations** — the original formula-validation diagnostic view plus two calculation reports. Each can be opened directly via its own URL hash and from a separate Fiori Launchpad tile, without visiting a home page first:
 
-| Destination | Local URL (with `npm run start-noflp`) | FLP tile intent parameter |
-|---|---|---|
-| Formula test | `#formula-test` (also the app default) | `report=formulaTest` |
-| Current month — all positions | `#current-month` | `report=currentMonth` |
-| Position — 12-month overview | `#year-report` or `#year-report/<pos>` | `report=yearReport` (optionally `&pos=<position>`) |
+| Destination | Direct URL, English | Direct URL, Lithuanian | FLP tile intent parameter |
+|---|---|---|---|
+| Formula test | `http://localhost:8080/index.html?sap-language=EN#/formula-test` | `http://localhost:8080/index.html?sap-language=LT#/formula-test` | `report=formulaTest` |
+| Monthly — all positions | `http://localhost:8080/index.html?sap-language=EN#/current-month` | `http://localhost:8080/index.html?sap-language=LT#/current-month` | `report=currentMonth` |
+| Position — 12-month overview | `http://localhost:8080/index.html?sap-language=EN#/year-report` | `http://localhost:8080/index.html?sap-language=LT#/year-report` | `report=yearReport` (optionally `&pos=<position>`) |
 
-All three reports share one navigation strip, so users can switch freely.
+All three reports share one navigation strip, so users can switch freely. The language is driven by the `sap-language` URL parameter or the FLP user profile language (bundles: `i18n.properties` (EN default), `i18n_en.properties`, `i18n_lt.properties`).
 
-### Current month — all positions
+### Monthly — all positions
 
-- One row per position of the internal plant (`2010`, a centralized constant, not a user parameter) for the **dynamically determined current month**; no filter bar needed, only a Refresh action.
+Direct URLs: [EN](http://localhost:8080/index.html?sap-language=EN#/current-month) · [LT](http://localhost:8080/index.html?sap-language=LT#/current-month) (`#current-month`)
+
+- One row per position of the internal plant (`2010`, a centralized constant, not a user parameter) for the month selected in the prompt window (defaults to the current month); a Parameters button reopens the prompt (period `year.month` + "Show positions with 0 amount" checkbox).
 - Columns: Main workshop, Position, Description, **Adjusted (JS)**, **Suggested (JS)**, **Adjusted (ABAP)**, **Suggested (ABAP)**, UOM, Past measurement (reference only, when exposed), Formula, Notes.
 - The four quantity columns come from two parser representations evaluated by the **same** evaluator against the same resolved references:
   - **JS** = terms of the independent JavaScript parser (`formulaParser.js`);
@@ -105,7 +125,9 @@ All three reports share one navigation strip, so users can switch freely.
 
 ### Position — 12-month overview
 
-- Two user-facing parameters only: **Position** and **Year** (year defaults to the current year). Exactly 12 rows (January–December) are always shown; empty months display `NO DATA` instead of disappearing.
+Direct URLs: [EN](http://localhost:8080/index.html?sap-language=EN#/year-report) · [LT](http://localhost:8080/index.html?sap-language=LT#/year-report) (`#year-report`, position prefilled: `#year-report/<pos>`)
+
+- Two user-facing parameters only, collected in the prompt window: **Position** and **Year** (year defaults to the current year), plus a "Show notes" checkbox. Exactly 12 rows (January–December) are always shown; empty months display `NO DATA` instead of disappearing.
 - The same four quantity variants, the same evaluator, resolver and aggregation rule as the current-month report (no second calculation engine).
 - Selecting a month shows a JS-vs-ABAP component comparison detail panel for that month.
 - Navigation from the current-month report prefills the position (`#year-report/<pos>`).
