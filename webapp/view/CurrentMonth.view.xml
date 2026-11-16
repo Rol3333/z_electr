@@ -1,7 +1,7 @@
 <mvc:View controllerName="zelectr.controller.CurrentMonth"
     xmlns:mvc="sap.ui.core.mvc"
     xmlns="sap.m">
-    <Page id="currentMonthPage" title="{i18n>cmTitle}" showNavButton="false">
+    <Page id="currentMonthPage" title="{i18n>cmTitle}" showNavButton="false" class="sapUiNoContentPadding">
         <headerContent>
             <Button icon="sap-icon://excel-attachment" tooltip="{i18n>exportExcel}" press=".onExportExcel"/>
             <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh"/>
@@ -40,7 +40,7 @@
                         <Column width="9rem" hAlign="End"><header><Text text="{i18n>colAdjAbap}" tooltip="{i18n>ttAdjAbap}"/></header></Column>
                         <Column width="9rem" hAlign="End"><header><Text text="{i18n>colSugAbap}" tooltip="{i18n>ttSugAbap}"/></header></Column>
                         <Column width="4rem"><header><Text text="{i18n>colUom}"/></header></Column>
-                        <Column width="6rem" visible="{vm>/hasPastMeasurement}"><header><Text text="{i18n>colPastMeasurement}"/></header></Column>
+                        <Column width="10rem" visible="{vm>/hasPastMeasurement}"><header><Text text="{i18n>colPastMeasurement}"/></header></Column>
                         <Column width="16rem"><header><Text text="{i18n>colFormula}"/></header></Column>
                         <Column width="18rem"><header><Text text="{i18n>colNotes}"/></header></Column>
                     </columns>

@@ -479,6 +479,35 @@ sap.ui.define([
 
             return readSourceRowsRangeWithOptional(PLANT, contextStart, range.end, caps)
                 .then(function (rawRows) {
+
+
+                var testPositions = new Set([
+                    "bE120", "bE121", "bE122", "bE125",
+                    "bE24X", "bE26X"
+                ]);
+
+                console.table(rawRows
+                    .filter(function (r) {
+                        return testPositions.has(r.Pos);
+                    })
+                    .map(function (r) {
+                        return {
+                            Position: r.Pos,
+                            Date: service.toIsoDate(r.ValidDate),
+
+                            HasWorkshop: Object.prototype.hasOwnProperty.call(r, "MainWorkshop"),
+                            Workshop: r.MainWorkshop,
+
+                            DescriptionField: caps.posDescr,
+                            HasDescription: Object.prototype.hasOwnProperty.call(r, caps.posDescr),
+                            Description: caps.posDescr ? r[caps.posDescr] : undefined
+                        };
+                    })
+                    .sort(function (a, b) {
+                        return a.Position.localeCompare(b.Position) ||
+                            a.Date.localeCompare(b.Date);
+                    }));
+
                     var rows = normalizeSourceRows(rawRows, caps);
                     var byPos = rowsByPosition(rows);
 
