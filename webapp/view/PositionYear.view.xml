@@ -5,7 +5,7 @@
         navButtonPress=".onNavBack">
         <headerContent>
             <Button icon="sap-icon://excel-attachment" tooltip="{i18n>exportExcel}" press=".onExportExcel"/>
-            <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onLoad"/>
+            <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onOpenPrompt"/>
             <Button icon="sap-icon://filter" tooltip="{i18n>pyParameters}" press=".onOpenPrompt"/>
         </headerContent>
         <content>
@@ -16,42 +16,80 @@
                     <Button text="{i18n>navYearReport}" type="Emphasized" press=".onNavYearReport"/>
                 </HBox>
 
-                <HBox wrap="Wrap" alignItems="Center" class="zeHeaderLine">
-                    <ObjectStatus text="{vm>/headerText}" state="None"/>
-                    <ObjectStatus text="{vm>/provisionalText}" state="Warning" class="zeUom"/>
-                </HBox>
-                <Text text="{vm>/capabilityText}" class="zeHint"/>
+                <!-- ============ Selection panel ============ -->
+                <Panel headerText="{i18n>pySelectionHeader}" class="zePanel">
+                    <content>
+                        <HBox wrap="Wrap" alignItems="End" class="zeFilterBar">
+                            <VBox class="zeFilterItem">
+                                <Label text="{i18n>pyPosition}" labelFor="pyPosInput"/>
+                                <Input id="pyPosInput" maxLength="15" width="12rem" placeholder="{i18n>positionPlaceholder}"/>
+                            </VBox>
+                            <VBox class="zeFilterItem">
+                                <Label text="{i18n>pyYear}" labelFor="pyYearInput"/>
+                                <Input id="pyYearInput" width="6rem" type="Number"/>
+                            </VBox>
+                            <VBox class="zeFilterItem">
+                                <Button id="pyLoadButton" text="{i18n>refresh}" type="Emphasized" press=".onLoad"/>
+                            </VBox>
+                        </HBox>
+                        <Text text="{i18n>pyHint}" class="zeHint"/>
+                    </content>
+                </Panel>
 
-                <Table id="yearTable" items="{vm>/months}" mode="SingleSelectMaster"
-                    selectionChange=".onMonthSelected" fixedLayout="false" width="100%"
-                    noDataText="{i18n>pyNoData}">
-                    <columns>
-                        <Column width="9rem"><header><Text text="{i18n>colMonth}"/></header></Column>
-                        <Column width="9rem" hAlign="End"><header><Text text="{i18n>colAdjJs}" tooltip="{i18n>ttAdjJs}"/></header></Column>
-                        <Column width="9rem" hAlign="End"><header><Text text="{i18n>colSugJs}" tooltip="{i18n>ttSugJs}"/></header></Column>
-                        <Column width="9rem" hAlign="End"><header><Text text="{i18n>colAdjAbap}" tooltip="{i18n>ttAdjAbap}"/></header></Column>
-                        <Column width="9rem" hAlign="End"><header><Text text="{i18n>colSugAbap}" tooltip="{i18n>ttSugAbap}"/></header></Column>
-                        <Column width="4rem"><header><Text text="{i18n>colUom}"/></header></Column>
-                        <Column width="10rem"><header><Text text="{i18n>colStatus}"/></header></Column>
-                        <Column width="20rem" visible="{vm>/showNotes}"><header><Text text="{i18n>colNotes}"/></header></Column>
-                    </columns>
-                    <items>
-                        <ColumnListItem type="Active">
-                            <cells>
-                                <Text text="{vm>monthLabel}"/>
-                                <Text text="{vm>adjJs}"/>
-                                <Text text="{vm>sugJs}"/>
-                                <Text text="{vm>adjAbap}"/>
-                                <Text text="{vm>sugAbap}"/>
-                                <Text text="{vm>uom}"/>
-                                <ObjectStatus text="{vm>status}" state="{vm>state}" tooltip="{vm>notesText}"/>
-                                <Text text="{vm>notesText}"/>
-                                <!-- Notes cell: populated only when "Show notes" is set -->
-                            </cells>
-                        </ColumnListItem>
-                    </items>
-                </Table>
+                <!-- ============ 12-month report panel: title, workshop, UOM, formula ============ -->
+                <Panel headerText="{i18n>pyReportHeader}" visible="{vm>/hasResults}" class="zePanel">
+                    <content>
+                        <HBox wrap="Wrap" alignItems="Center" class="zeHeaderLine">
+                            <ObjectStatus text="{vm>/headerText}" state="None"/>
+                            <ObjectStatus text="{vm>/provisionalText}" state="Warning" class="zeUom"/>
+                        </HBox>
+                        <HBox wrap="Wrap" alignItems="Center" class="zeHeaderLine">
+                            <ObjectStatus text="{i18n>colWorkshop}: {vm>/headerInfo/workshop}" state="None"/>
+                            <ObjectStatus text="{i18n>colPosDescr}: {vm>/headerInfo/descr}" state="None" class="zeUom"/>
+                            <ObjectStatus text="{i18n>colUom}: {vm>/headerInfo/uom}" state="None" class="zeUom"/>
+                        </HBox>
+                        <Text text="{vm>/headerInfo/formula}" class="zeFormula"/>
+                        <Text text="{vm>/capabilityText}" class="zeHint"/>
+                    </content>
+                </Panel>
 
+                <!-- ============ 12-month data table panel ============ -->
+                <Panel headerText="{i18n>pyDataHeader}" visible="{vm>/hasResults}" class="zePanel">
+                    <content>
+                        <Table id="yearTable" items="{vm>/months}" mode="SingleSelectMaster"
+                            selectionChange=".onMonthSelected" fixedLayout="false" width="100%"
+                            noDataText="{i18n>pyNoData}">
+                            <columns>
+                                <Column width="9rem"><header><Text text="{i18n>colMonth}"/></header></Column>
+                                <Column width="9rem" hAlign="End"><header><Text text="{i18n>colAdjJs}" tooltip="{i18n>ttAdjJs}"/></header></Column>
+                                <Column width="9rem" hAlign="End"><header><Text text="{i18n>colSugJs}" tooltip="{i18n>ttSugJs}"/></header></Column>
+                                <Column width="9rem" hAlign="End"><header><Text text="{i18n>colAdjAbap}" tooltip="{i18n>ttAdjAbap}"/></header></Column>
+                                <Column width="9rem" hAlign="End"><header><Text text="{i18n>colSugAbap}" tooltip="{i18n>ttSugAbap}"/></header></Column>
+                                <Column width="9rem" hAlign="End"><header><Text text="{i18n>colPastMeasurement}" tooltip="{i18n>ttPastMeasurement}"/></header></Column>
+                                <Column width="4rem"><header><Text text="{i18n>colUom}"/></header></Column>
+                                <Column width="10rem"><header><Text text="{i18n>colStatus}"/></header></Column>
+                                <Column width="20rem" visible="{vm>/showNotes}"><header><Text text="{i18n>colNotes}"/></header></Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem type="Active">
+                                    <cells>
+                                        <Text text="{vm>monthLabel}"/>
+                                        <Text text="{vm>adjJs}"/>
+                                        <Text text="{vm>sugJs}"/>
+                                        <Text text="{vm>adjAbap}"/>
+                                        <Text text="{vm>sugAbap}"/>
+                                        <Text text="{vm>pastMeasurement}"/>
+                                        <Text text="{vm>uom}"/>
+                                        <ObjectStatus text="{vm>status}" state="{vm>state}" tooltip="{vm>notesText}"/>
+                                        <Text text="{vm>notesText}"/>
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+
+                <!-- ============ Component comparison detail panel ============ -->
                 <Panel headerText="{i18n>pyDetailHeader}" visible="{vm>/hasDetail}" class="zePanel">
                     <content>
                         <Text text="{vm>/detail/formula}" class="zeFormula"/>
@@ -88,8 +126,6 @@
                         </Table>
                     </content>
                 </Panel>
-
-                <Text text="{i18n>pyHint}" class="zeHint"/>
             </VBox>
         </content>
     </Page>

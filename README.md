@@ -68,7 +68,20 @@ The parser and calculation modules are also plain JavaScript and can be exercise
 
 Client-side performance instrumentation to identify where report loading time is spent (OData reads/pages/chunks vs JavaScript processing). **Observational only** — no retrieval, calculation or UI behaviour changes; with diagnostics disabled (the default) nothing is printed and behaviour is unchanged.
 
-### Enabling
+### Always-on report statistics (no flag needed)
+
+Every completed (or failed) Monthly / 12-month report prints **one** `[REPORT STATS]` line to the browser console (F12), measuring the user-perceived time from the prompt window opening (or the Refresh press) until the final report is rendered:
+
+```text
+[REPORT STATS] CURRENT_MONTH [stats-001] | trigger=prompt | prompt opened=19:15:01.120 | run pressed=19:15:07.450 (think 6,330.0 ms) | data loaded=19:15:09.870 (extraction 2,420.0 ms) | rendered=19:15:09.950 (render 80.0 ms) | TOTAL=8,830.0 ms (prompt/refresh -> final report) | outcome=success | rows=42
+```
+
+- `trigger=prompt` — the stopwatch started when the prompt window was populated; `trigger=refresh` — it started when the Refresh button was pressed;
+- `think` = prompt opened → Run/Refresh pressed; `extraction` = button pressed → data loaded; `render` = data loaded → final report on screen;
+- `TOTAL` is the key figure: prompt/refresh → final report;
+- `outcome=failed` lines are printed when a report run fails.
+
+### Enabling (detailed diagnostics)
 
 Append the URL flag **before the hash** (per browser session, no persistent storage):
 
@@ -97,6 +110,7 @@ Open the browser **developer console** (F12) and run a report. Each run gets a u
 
 - `[ODATA]` lines = logical service operations, per OData **page** (`__next` continuation) and per source-position **chunk** — counts and durations only, never payloads, formulas, quantities or URLs;
 - `[PERF]` lines = JavaScript processing stages (reference-position collection, source index, per-position calculation) and the report run summary;
+- `[REPORT STATS]` lines = always-on user-perceived report timing (see above), printed with or without the `debugPerf` flag;
 - report labels: `CURRENT_MONTH`, `YEAR_REPORT`, `FORMULA_TEST`;
 - failed pages/chunks/operations are logged as failures and counted in the summary; the original error behaviour is preserved.
 

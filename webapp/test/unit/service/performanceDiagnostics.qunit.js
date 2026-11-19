@@ -123,6 +123,65 @@ sap.ui.define([
             "stage duration and counts logged: " + joined);
     });
 
+    QUnit.test("stats: always-on even when the debug flag is disabled", function (assert) {
+        perf.setEnabledForTest(false);
+        var token = perf.beginUserAction("CURRENT_MONTH", "prompt");
+        assert.ok(token, "stats token returned while diagnostics disabled");
+        perf.markUserAction(token, "run_pressed");
+        perf.markUserAction(token, "data_loaded");
+        perf.endUserAction(token, "success", { rows: 42 });
+        var joined = captured.join("\n");
+        assert.ok(/\[REPORT STATS\] CURRENT_MONTH/.test(joined), "stats line printed while disabled");
+        assert.ok(/trigger=prompt/.test(joined), "trigger logged");
+        assert.ok(/outcome=success/.test(joined), "outcome logged");
+        assert.ok(/rows=42/.test(joined), "details logged");
+        assert.ok(/TOTAL=.*\(prompt\/refresh -> final report\)/.test(joined), "total duration logged");
+    });
+
+    QUnit.test("stats: prompt trigger measures from prompt opening", function (assert) {
+        var token = perf.beginUserAction("YEAR_REPORT", "prompt");
+        assert.notStrictEqual(token.promptOpenedAt, null, "prompt opened timestamp recorded at start");
+        assert.strictEqual(token.runStartedAt, null, "run not pressed yet");
+        perf.markUserAction(token, "run_pressed");
+        perf.markUserAction(token, "data_loaded");
+        perf.endUserAction(token, "success");
+        var joined = captured.join("\n");
+        assert.ok(/prompt opened=\d\d:\d\d:\d\d\.\d\d\d/.test(joined), "prompt opened wall time logged");
+        assert.ok(/run pressed=\d\d:\d\d:\d\d\.\d\d\d \(think .*ms\)/.test(joined), "think time logged");
+        assert.ok(/data loaded=.*\(extraction .*ms\)/.test(joined), "extraction time logged");
+        assert.ok(/rendered=.*\(render .*ms\)/.test(joined), "render time logged");
+    });
+
+    QUnit.test("stats: refresh trigger measures from the button press", function (assert) {
+        var token = perf.beginUserAction("CURRENT_MONTH", "refresh");
+        assert.strictEqual(token.promptOpenedAt, null, "no prompt opened timestamp");
+        assert.notStrictEqual(token.runStartedAt, null, "run pressed timestamp recorded at start");
+        perf.markUserAction(token, "data_loaded");
+        perf.endUserAction(token, "success");
+        var joined = captured.join("\n");
+        assert.ok(/trigger=refresh/.test(joined), "refresh trigger logged");
+        assert.ok(/prompt opened=-/.test(joined), "missing prompt time shown as -");
+        assert.ok(/\(think /.test(joined) === false, "no think time without prompt");
+    });
+
+    QUnit.test("stats: marks are first-wins and safe on null tokens", function (assert) {
+        var token = perf.beginUserAction("YEAR_REPORT", "prompt");
+        var first = token.promptOpenedAt;
+        perf.markUserAction(token, "prompt_opened");
+        assert.strictEqual(token.promptOpenedAt, first, "second prompt mark ignored");
+        perf.markUserAction(null, "run_pressed");
+        perf.endUserAction(null, "success");
+        assert.strictEqual(captured.length, 0, "null tokens produce no output");
+    });
+
+    QUnit.test("stats: failed outcome is logged", function (assert) {
+        var token = perf.beginUserAction("YEAR_REPORT", "refresh");
+        perf.markUserAction(token, "run_pressed");
+        perf.endUserAction(token, "failed");
+        var joined = captured.join("\n");
+        assert.ok(/outcome=failed/.test(joined), "failed outcome logged");
+    });
+
     QUnit.test("logs never contain payloads, formulas or credentials", function (assert) {
         perf.setEnabledForTest(true);
         var run = perf.beginReportRun("FORMULA_TEST", { plant: "2010", pos: "bE125" });

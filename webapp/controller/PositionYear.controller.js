@@ -99,32 +99,71 @@ sap.ui.define([
             if (!this._yearInput.getValue()) {
                 this._yearInput.setValue(String(new Date().getFullYear()));
             }
+            // start the always-on user-perceived statistics stopwatch at the
+            // moment the prompt window is populated
+            this._beginStats("prompt");
             // open the prompt (prefilled when navigated from the Monthly report)
             this._promptDialog.open();
         },
 
         onOpenPrompt: function () {
+            this._beginStats("prompt");
             this._promptDialog.open();
+        },
+
+        /**
+         * Starts (or restarts) the always-on report statistics stopwatch.
+         * An already-running stopwatch is closed as "aborted" first.
+         *
+         * @param {string} trigger "prompt" | "refresh"
+         */
+        _beginStats: function (trigger) {
+            if (this._stats) {
+                perf.endUserAction(this._stats, "aborted");
+            }
+            this._stats = perf.beginUserAction("YEAR_REPORT", trigger);
         },
 
         onLoad: function () {
             var self = this;
             var oView = this.getView();
-            var sPos = (this._posInput.getValue() || "").trim();
-            var sYear = (this._yearInput.getValue() || "").trim();
+            // read the Selection panel inputs; when the report is started from
+            // the prompt dialog (Run button), fall back to the prompt inputs
+            var sPos = (oView.byId("pyPosInput").getValue() || "").trim();
+            var sYear = (oView.byId("pyYearInput").getValue() || "").trim();
+            if ((!sPos || !sYear) && this._posInput) {
+                sPos = (this._posInput.getValue() || "").trim();
+                sYear = (this._yearInput.getValue() || "").trim();
+            }
             var year = parseInt(sYear, 10);
 
             if (!sPos || !sYear || isNaN(year) || year < 1900 || year > 2200) {
+                if (this._stats) {
+                    perf.endUserAction(this._stats, "failed");
+                    this._stats = null;
+                }
                 MessageBox.warning(this._text("pyMissingInput"));
                 return;
             }
+            // keep both entry points in sync with the effective values
+            oView.byId("pyPosInput").setValue(sPos);
+            oView.byId("pyYearInput").setValue(sYear);
+            this._posInput.setValue(sPos);
+            this._yearInput.setValue(sYear);
             this._showNotes = this._notesCheckBox.getSelected();
             this._viewModel.setProperty("/showNotes", this._showNotes);
 
             var run = perf.beginReportRun("YEAR_REPORT", { plant: "2010", pos: sPos, year: year });
+            // stats stopwatch: reuse the prompt-opened token when present,
+            // otherwise start at this refresh press
+            var stats = this._stats || perf.beginUserAction("YEAR_REPORT", "refresh");
+            this._stats = stats;
+            perf.markUserAction(stats, "run_pressed");
 
             // clear stale data before new requests are issued
             this._viewModel.setProperty("/months", []);
+            this._viewModel.setProperty("/hasResults", false);
+            this._viewModel.setProperty("/headerInfo", {});
             this._viewModel.setProperty("/hasDetail", false);
             this._viewModel.setProperty("/detail", {});
             this._months = [];
@@ -132,12 +171,18 @@ sap.ui.define([
             this._reportService.buildYearReport({ pos: sPos, year: year })
                 .then(function (report) {
                     self._months = report.months;
+                    perf.markUserAction(stats, "data_loaded");
                     self._present(report);
                     perf.endReportRun(run, "success", { outputRows: report.months.length });
                     oView.setBusy(false);
+                    // log the stats line once the final report is rendered
+                    perf.endUserActionWhenRendered(stats, "success", { rows: report.months.length });
+                    self._stats = null;
                 })
                 .catch(function (err) {
                     perf.endReportRun(run, "failed");
+                    perf.endUserAction(stats, "failed");
+                    self._stats = null;
                     oView.setBusy(false);
                     MessageBox.error("Year report failed\n" +
                         (err && err.message ? err.message : err));
@@ -157,6 +202,7 @@ sap.ui.define([
                     adjAbap: m.adjAbap === "" ? "" : fmt.formatDiagnostic(m.adjAbap),
                     sugAbap: m.sugAbap === "" ? "" : fmt.formatDiagnostic(m.sugAbap),
                     uom: m.uom || "",
+                    pastMeasurement: m.pastMeasurement == null ? "—" : m.pastMeasurement,
                     status: m.status,
                     state: m.state,
                     // "Show notes" off -> the Notes column is not populated
@@ -164,8 +210,37 @@ sap.ui.define([
                 };
             });
             this._viewModel.setProperty("/months", months);
+            this._viewModel.setProperty("/hasResults", months.length > 0);
             this._viewModel.setProperty("/headerText",
                 report.header.pos + " - " + report.header.year);
+
+            // sync the Selection panel + prompt inputs with the canonical
+            // values from the report (e.g. case-insensitive match bE125)
+            var oView = this.getView();
+            if (oView.byId("pyPosInput")) {
+                oView.byId("pyPosInput").setValue(report.header.pos);
+            }
+            if (oView.byId("pyYearInput")) {
+                oView.byId("pyYearInput").setValue(String(report.header.year));
+            }
+            this._posInput.setValue(report.header.pos);
+            this._yearInput.setValue(String(report.header.year));
+
+            // header context above the table: workshop, description, UOM and
+            // the latest available formula (months are chronological, so the
+            // last non-empty formula is the most recent one)
+            var latestFormula = "";
+            report.months.forEach(function (m) {
+                if (m.formula) {
+                    latestFormula = m.formula;
+                }
+            });
+            this._viewModel.setProperty("/headerInfo", {
+                workshop: report.header.workshop || "",
+                descr: report.header.descr || "",
+                uom: report.header.uom || "",
+                formula: latestFormula
+            });
             this._viewModel.setProperty("/provisionalText",
                 "PROVISIONAL - P() rule not verified");
 
@@ -264,6 +339,7 @@ sap.ui.define([
                 { label: this._text("colSugJs"), key: "sugJs" },
                 { label: this._text("colAdjAbap"), key: "adjAbap" },
                 { label: this._text("colSugAbap"), key: "sugAbap" },
+                { label: this._text("colPastMeasurement"), key: "pastMeasurement" },
                 { label: this._text("colUom"), key: "uom" },
                 { label: this._text("colStatus"), key: "status" }
             ];

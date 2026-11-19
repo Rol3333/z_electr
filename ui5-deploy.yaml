@@ -19,6 +19,6 @@ builder:
         app:
           name: ZELECTRCNTR01
           package: ZKAG000
-          transport: DS4K930939
+          transport: DS4K931147
         exclude:
           - /test/

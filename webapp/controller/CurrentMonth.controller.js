@@ -38,16 +38,23 @@ sap.ui.define([
             this._viewModel = new JSONModel({
                 rows: [],
                 rangeText: "",
+                refreshText: "",
                 latestDateText: "",
                 provisionalText: "",
                 capabilityText: "",
                 kpiText: "",
                 zeroFilterText: "",
-                hasPastMeasurement: false
+                hasPastMeasurement: false,
+                hasResults: false
             });
             this.getView().setModel(this._viewModel, "vm");
             this._rows = [];
             this._showZero = false;
+
+            // prefill the Selection panel period with the current month
+            var now = new Date();
+            this.byId("cmPeriodInput").setValue(
+                now.getFullYear() + "." + String(now.getMonth() + 1).padStart(2, "0"));
 
             this._createPromptDialog();
 
@@ -66,6 +73,9 @@ sap.ui.define([
          */
         _onRouteMatched: function () {
             var self = this;
+            // start the always-on user-perceived statistics stopwatch at the
+            // moment the prompt window is populated
+            this._beginStats("prompt");
             setTimeout(function () {
                 try {
                     if (self._promptDialog && !self._promptDialog.isOpen()) {
@@ -109,15 +119,37 @@ sap.ui.define([
         },
 
         onOpenPrompt: function () {
+            this._beginStats("prompt");
             this._promptDialog.open();
+        },
+
+        /**
+         * Starts (or restarts) the always-on report statistics stopwatch.
+         * An already-running stopwatch is closed as "aborted" first.
+         *
+         * @param {string} trigger "prompt" | "refresh"
+         */
+        _beginStats: function (trigger) {
+            if (this._stats) {
+                perf.endUserAction(this._stats, "aborted");
+            }
+            this._stats = perf.beginUserAction("CURRENT_MONTH", trigger);
         },
 
         onRefresh: function () {
             var self = this;
             var oView = this.getView();
 
+            // read the Selection panel inputs; when the report is started from
+            // the prompt dialog (Run button), fall back to the prompt inputs
+            var sPeriod = (oView.byId("cmPeriodInput").getValue() || "").trim();
+            var bZero = oView.byId("cmZeroCheck").getSelected();
+            if (!sPeriod && this._periodInput) {
+                sPeriod = (this._periodInput.getValue() || "").trim();
+                bZero = this._zeroCheckBox.getSelected();
+            }
+
             // parse the period parameter: year.month (e.g. 2026.04 or 2026.4)
-            var sPeriod = (this._periodInput.getValue() || "").trim();
             var year, month;
             var m = /^(\d{4})[.\-/](\d{1,2})$/.exec(sPeriod);
             if (m) {
@@ -127,28 +159,44 @@ sap.ui.define([
                 var now = new Date();
                 year = now.getFullYear();
                 month = now.getMonth() + 1;
-                this._periodInput.setValue(year + "." + String(month).padStart(2, "0"));
+                sPeriod = year + "." + String(month).padStart(2, "0");
             }
             if (!year || !month || month < 1 || month > 12) {
                 MessageBox.warning(this._text("cmInvalidPeriod"));
                 return;
             }
-            this._showZero = this._zeroCheckBox.getSelected();
+            // keep both entry points in sync with the effective values
+            oView.byId("cmPeriodInput").setValue(sPeriod);
+            oView.byId("cmZeroCheck").setSelected(bZero);
+            this._periodInput.setValue(sPeriod);
+            this._zeroCheckBox.setSelected(bZero);
+            this._showZero = bZero;
 
             var run = perf.beginReportRun("CURRENT_MONTH", {
                 plant: "2010",
                 period: year + "-" + String(month).padStart(2, "0")
             });
+            // stats stopwatch: reuse the prompt-opened token when present,
+            // otherwise start at this refresh press
+            var stats = this._stats || perf.beginUserAction("CURRENT_MONTH", "refresh");
+            this._stats = stats;
+            perf.markUserAction(stats, "run_pressed");
             oView.setBusy(true);
             this._reportService.buildCurrentMonthReport({ year: year, month: month })
                 .then(function (report) {
                     self._rows = report.rows;
+                    perf.markUserAction(stats, "data_loaded");
                     self._present(report);
                     perf.endReportRun(run, "success", { outputRows: report.rows.length });
                     oView.setBusy(false);
+                    // log the stats line once the final report is rendered
+                    perf.endUserActionWhenRendered(stats, "success", { rows: report.rows.length });
+                    self._stats = null;
                 })
                 .catch(function (err) {
                     perf.endReportRun(run, "failed");
+                    perf.endUserAction(stats, "failed");
+                    self._stats = null;
                     oView.setBusy(false);
                     MessageBox.error("Monthly report failed\n" +
                         (err && err.message ? err.message : err));
@@ -178,8 +226,8 @@ sap.ui.define([
                     uom: r.uom || "",
                     pastMeasurement: r.pastMeasurement == null ? "—" : r.pastMeasurement,
                     formula: r.formula || "",
-                    formulaShort: r.formula && r.formula.length > 60
-                        ? r.formula.substring(0, 60) + "…" : (r.formula || "—"),
+                    formulaShort: r.formula && r.formula.length > 80
+                        ? r.formula.substring(0, 80) + "…" : (r.formula || "—"),
                     status: r.status,
                     state: r.state,
                     notesText: r.notes.join(" | ")
@@ -206,7 +254,15 @@ sap.ui.define([
 
             this._viewModel.setProperty("/rows", rows);
             this._viewModel.setProperty("/hasPastMeasurement", !!caps.pastMeasurement);
+            this._viewModel.setProperty("/hasResults", true);
             this._viewModel.setProperty("/rangeText", "Period: " + report.rangeStart + " … " + report.rangeEnd);
+            // last data refresh = the moment the report data was (re)loaded
+            var d = new Date();
+            var pad = function (n) { return String(n).padStart(2, "0"); };
+            this._viewModel.setProperty("/refreshText",
+                this._text("cmLastRefresh") + ": " +
+                d.getFullYear() + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate()) +
+                " " + pad(d.getHours()) + ":" + pad(d.getMinutes()));
             this._viewModel.setProperty("/latestDateText", report.latestSourceDate
                 ? "Latest source data: " + report.latestSourceDate
                 : "No source data in period");
@@ -310,7 +366,12 @@ sap.ui.define([
                 }
                 return true;
             });
-            var period = (this._periodInput.getValue() || "").replace(/[^0-9]/g, "");
+            var oView = this.getView();
+            var sPeriod = (oView.byId("cmPeriodInput").getValue() || "").trim();
+            if (!sPeriod) {
+                sPeriod = (this._periodInput.getValue() || "").trim();
+            }
+            var period = sPeriod.replace(/[^0-9]/g, "");
             exportHelper.exportCsv("monthly-report_" + period, columns, rows);
         },
 

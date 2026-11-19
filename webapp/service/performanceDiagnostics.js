@@ -18,6 +18,9 @@
  *   [PERF][run-0007][CURRENT_MONTH] ...   - report run / JS stages
  *   [ODATA][run-0007] ...                 - OData logical operations,
  *                                           pages and chunks
+ *   [REPORT STATS] ...                    - ALWAYS-ON user-perceived
+ *                                           report timing (prompt opened /
+ *                                           refresh pressed -> final report)
  *
  * Timing rules (per the brief):
  *   - durations use performance.now() (monotonic), never wall-clock Date;
@@ -257,6 +260,156 @@ sap.ui.define([], function () {
             ", status=" + (d.status || "success"));
     }
 
+    // ------------------------------------------------------------------
+    // ALWAYS-ON report statistics (independent of the ?debugPerf=1 flag)
+    //
+    // Measures the user-perceived report time:
+    //   prompt window opened -> Run/Refresh pressed -> data loaded ->
+    //   final report rendered
+    // One [REPORT STATS] line is printed per completed (or failed) report.
+    // ------------------------------------------------------------------
+
+    var statsCounter = 0;
+
+    /**
+     * Starts a user-action stopwatch. Always records (no feature flag).
+     *
+     * @param {string} reportName e.g. CURRENT_MONTH, YEAR_REPORT
+     * @param {string} trigger "prompt" (dialog opened) | "refresh" (button pressed)
+     * @param {object} [context] safe summary values (plant, period, pos, year)
+     * @returns {object} stats token to pass to markUserAction/endUserAction
+     */
+    function beginUserAction(reportName, trigger, context) {
+        var t = now();
+        var w = Date.now();
+        var token = {
+            statsId: "stats-" + String(++statsCounter).padStart(3, "0"),
+            reportName: reportName,
+            trigger: trigger || "refresh",
+            context: context || {},
+            createdAt: t,
+            createdWall: w,
+            promptOpenedAt: null,
+            promptOpenedWall: null,
+            runStartedAt: null,
+            runStartedWall: null,
+            dataLoadedAt: null,
+            dataLoadedWall: null
+        };
+        if (token.trigger === "prompt") {
+            token.promptOpenedAt = t;
+            token.promptOpenedWall = w;
+        } else {
+            token.runStartedAt = t;
+            token.runStartedWall = w;
+        }
+        return token;
+    }
+
+    /**
+     * Marks a milestone on the stats token. Only the first mark of each
+     * stage is kept (repeated calls are ignored).
+     *
+     * @param {object} token from beginUserAction
+     * @param {string} stage "prompt_opened" | "run_pressed" | "data_loaded"
+     */
+    function markUserAction(token, stage) {
+        if (!token) {
+            return;
+        }
+        var t = now();
+        var w = Date.now();
+        if (stage === "prompt_opened" && token.promptOpenedAt === null) {
+            token.promptOpenedAt = t;
+            token.promptOpenedWall = w;
+        } else if (stage === "run_pressed" && token.runStartedAt === null) {
+            token.runStartedAt = t;
+            token.runStartedWall = w;
+        } else if (stage === "data_loaded" && token.dataLoadedAt === null) {
+            token.dataLoadedAt = t;
+            token.dataLoadedWall = w;
+        }
+    }
+
+    function fmtWall(ms) {
+        if (ms === null || ms === undefined) {
+            return "-";
+        }
+        var d = new Date(ms);
+        var pad = function (n, width) {
+            return String(n).padStart(width || 2, "0");
+        };
+        return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" +
+            pad(d.getSeconds()) + "." + pad(d.getMilliseconds(), 3);
+    }
+
+    function fmtMs(v) {
+        return (v === null || v === undefined) ? "-" : v.toFixed(1) + " ms";
+    }
+
+    /**
+     * Ends the stopwatch and prints the single always-on stats line.
+     * Total time is measured from the prompt opening (when the prompt was
+     * the entry point) or from the refresh press until this call.
+     *
+     * @param {object} token from beginUserAction
+     * @param {string} outcome "success" | "failed" | "aborted"
+     * @param {object} [details] safe extra counters (rows, positions)
+     */
+    function endUserAction(token, outcome, details) {
+        if (!token) {
+            return;
+        }
+        var endAt = now();
+        var endWall = Date.now();
+        var startAt = token.promptOpenedAt !== null ? token.promptOpenedAt : token.runStartedAt;
+        var startWall = token.promptOpenedWall !== null ? token.promptOpenedWall : token.runStartedWall;
+        var totalMs = (startAt !== null && startAt !== undefined) ? endAt - startAt : null;
+        var thinkMs = (token.promptOpenedAt !== null && token.runStartedAt !== null)
+            ? token.runStartedAt - token.promptOpenedAt : null;
+        var extractMs = (token.runStartedAt !== null && token.dataLoadedAt !== null)
+            ? token.dataLoadedAt - token.runStartedAt : null;
+        var renderMs = (token.dataLoadedAt !== null) ? endAt - token.dataLoadedAt : null;
+        var d = details || {};
+        var parts = [
+            "[REPORT STATS] " + token.reportName + " [" + token.statsId + "]",
+            "trigger=" + token.trigger,
+            "prompt opened=" + fmtWall(token.promptOpenedWall),
+            "run pressed=" + fmtWall(token.runStartedWall) +
+                (thinkMs !== null ? " (think " + fmtMs(thinkMs) + ")" : ""),
+            "data loaded=" + fmtWall(token.dataLoadedWall) +
+                (extractMs !== null ? " (extraction " + fmtMs(extractMs) + ")" : ""),
+            "rendered=" + fmtWall(endWall) +
+                (renderMs !== null ? " (render " + fmtMs(renderMs) + ")" : ""),
+            "TOTAL=" + fmtMs(totalMs) + " (prompt/refresh -> final report)",
+            "outcome=" + outcome
+        ];
+        if (d.rows !== undefined) {
+            parts.push("rows=" + d.rows);
+        }
+        if (d.positions !== undefined) {
+            parts.push("positions=" + d.positions);
+        }
+        console.info("%c" + parts.join(" | "), "font-weight: bold;");
+    }
+
+    /**
+     * Ends the stopwatch after the browser had a chance to render the
+     * final report (defers with setTimeout so the DOM update completes).
+     *
+     * @param {object} token from beginUserAction
+     * @param {string} outcome "success" | "failed"
+     * @param {object} [details] safe extra counters (rows, positions)
+     */
+    function endUserActionWhenRendered(token, outcome, details) {
+        if (!token) {
+            return;
+        }
+        setTimeout(function () {
+            endUserAction(token, outcome, details);
+        }, 0);
+    }
+
     /**
      * Logs a safe error (never the payload).
      */
@@ -282,6 +435,10 @@ sap.ui.define([], function () {
         logODataPage: logODataPage,
         logODataOperation: logODataOperation,
         logODataChunk: logODataChunk,
-        logError: logError
+        logError: logError,
+        beginUserAction: beginUserAction,
+        markUserAction: markUserAction,
+        endUserAction: endUserAction,
+        endUserActionWhenRendered: endUserActionWhenRendered
     };
 });
